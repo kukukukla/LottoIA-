@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+"""
+Motor Estatístico de Loterias v2.0 — Web Application
+FastAPI + Jinja2 + Session Auth
+"""
+
+import os
+import random
+import numpy as np
+from datetime import date, timedelta
+from typing import Optional
+
+from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+
+from core.models import Concurso, LoteriaTipo
+from core.main_engine import MotorPrincipal
+
+# ──────────────────────────────────────────────
+# App setup
+# ──────────────────────────────────────────────
+app = FastAPI(title="Motor Estatístico de Loterias v2.0")
+
+SECRET_KEY = os.environ.get("SESSION_SECRET", "loteria-dev-secret-2024")
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+# ──────────────────────────────────────────────
+# Demo credentials (replace with DB in production)
+# ──────────────────────────────────────────────
+USERS = {
+    "admin": "loterias2024",
+    "demo":  "demo123",
+}
+
+# ──────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────
+def get_current_user(request: Request) -> Optional[str]:
+    return request.session.get("user")
+
+def require_login(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=302, headers={"Location": "/"})
+    return user
+
+def gerar_dados_teste(loteria: LoteriaTipo, n: int = 300) -> list:
+    concursos = []
+    data_base = date(2000, 1, 1)
+    for i in range(1, n + 1):
+        dezenas = sorted(random.sample(
+            range(1, loteria.dezenas_totais + 1),
+            loteria.dezenas_sorteadas
+        ))
+        concursos.append(Concurso(
+            numero=i,
+            data=data_base + timedelta(days=i * 3),
+            dezenas=dezenas,
+            loteria=loteria
+        ))
+    return concursos
+
+# ──────────────────────────────────────────────
+# Auth routes
+# ──────────────────────────────────────────────
+@app.get("/", response_class=HTMLResponse)
+async def login_page(request: Request):
+    if get_current_user(request):
+        return RedirectResponse("/dashboard", status_code=302)
+    return templates.TemplateResponse(request, "login.html", {"error": None})
+
+@app.post("/login", response_class=HTMLResponse)
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    if USERS.get(username) == password:
+        request.session["user"] = username
+        return RedirectResponse("/dashboard", status_code=302)
+    return templates.TemplateResponse(request, "login.html", {
+        "error": "Usuário ou senha incorretos."
+    })
+
+@app.get("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/", status_code=302)
+
+# ──────────────────────────────────────────────
+# Dashboard
+# ──────────────────────────────────────────────
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    return templates.TemplateResponse(request, "dashboard.html", {"user": user})
+
+# ──────────────────────────────────────────────
+# API — Análise Rápida
+# ──────────────────────────────────────────────
+@app.get("/api/analise")
+async def api_analise(request: Request):
+    if not get_current_user(request):
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+
+    random.seed(None)
+    np.random.seed(None)
+    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    motor = MotorPrincipal(concursos)
+
+    freq = motor.estatistico.frequencia_absoluta()
+    top10_freq = sorted(freq.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    atraso = motor.estatistico.atraso_atual()
+    top10_atraso = sorted(atraso.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    est_soma = motor.estatistico.estatisticas_soma()
+
+    top10_score = motor.score.top_dezenas(10)
+
+    return {
+        "frequencia": [{"dezena": d, "ocorrencias": f} for d, f in top10_freq],
+        "atraso":     [{"dezena": d, "concursos": a} for d, a in top10_atraso],
+        "soma": {
+            "media":      est_soma["media"],
+            "mediana":    est_soma["mediana"],
+            "desvio":     est_soma["desvio_padrao"],
+            "p25":        est_soma["percentil_25"],
+            "p75":        est_soma["percentil_75"],
+        },
+        "score": [
+            {"ranking": s.ranking, "dezena": s.dezena, "score": round(s.score_total, 4)}
+            for s in top10_score
+        ],
+        "total_concursos": len(concursos),
+    }
+
+# ──────────────────────────────────────────────
+# API — Gerar Jogos
+# ──────────────────────────────────────────────
+@app.get("/api/gerar")
+async def api_gerar(
+    request: Request,
+    metodo: str = "aleatorio",
+    dezenas: int = 15,
+    jogos: int = 5,
+):
+    if not get_current_user(request):
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+
+    metodos_validos = ["aleatorio", "score", "frequencia", "atraso", "balanceado", "fibonacci"]
+    if metodo not in metodos_validos:
+        return JSONResponse({"error": f"Método inválido. Use: {metodos_validos}"}, status_code=400)
+
+    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    motor = MotorPrincipal(concursos)
+    resultado = motor.gerar_jogos(metodo, n_dezenas=dezenas, n_jogos=jogos)
+
+    return {
+        "metodo": metodo,
+        "dezenas": dezenas,
+        "jogos": [j["dezenas"] for j in resultado],
+    }
+
+# ──────────────────────────────────────────────
+# API — Monte Carlo
+# ──────────────────────────────────────────────
+@app.get("/api/simular")
+async def api_simular(request: Request, n: int = 1000):
+    if not get_current_user(request):
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+
+    if n > 10000:
+        return JSONResponse({"error": "Máximo 10.000 simulações por requisição."}, status_code=400)
+
+    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    motor = MotorPrincipal(concursos)
+    rel = motor.simulacoes.monte_carlo_aleatorio(n, 15)
+
+    return {
+        "total":   rel.total_simulacoes,
+        "media":   rel.media_acertos,
+        "maximo":  rel.max_acertos,
+        "minimo":  rel.min_acertos,
+        "desvio":  rel.desvio_padrao,
+        "distribuicao": {str(k): v for k, v in sorted(rel.acertos_percentual.items())},
+    }
+
+# ──────────────────────────────────────────────
+# API — Testes Estatísticos
+# ──────────────────────────────────────────────
+@app.get("/api/testes")
+async def api_testes(request: Request):
+    if not get_current_user(request):
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+
+    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    motor = MotorPrincipal(concursos)
+
+    chi  = motor.comparativo.teste_chi_quadrado(concursos)
+    ks   = motor.comparativo.teste_ks(concursos)
+    runs = motor.comparativo.teste_runs(concursos, 1)
+
+    return {
+        "chi_quadrado": {
+            "chi2":         chi.get("chi2"),
+            "p_value":      chi.get("p_value"),
+            "conclusao":    chi.get("conclusao", chi.get("interpretacao", "")),
+        },
+        "kolmogorov_smirnov": {
+            "statistic":    ks.get("statistic"),
+            "p_value":      ks.get("p_value"),
+            "interpretacao": ks.get("interpretacao", ""),
+        },
+        "runs": {
+            "z_score":      runs.get("z_score"),
+            "interpretacao": runs.get("interpretacao", ""),
+        },
+    }
+
+# ──────────────────────────────────────────────
+# Entry point
+# ──────────────────────────────────────────────
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=5000, reload=False)

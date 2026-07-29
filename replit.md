@@ -11,21 +11,30 @@ Plataforma profissional de análise quantitativa para loterias brasileiras (Loto
 
 ## How to run
 
+The Replit workflow runs `python app.py` — the FastAPI web server on port 5000.
+
+```
+http://localhost:5000/          → Login
+http://localhost:5000/dashboard → Dashboard (requires login)
+```
+
+**Credentials (test):** `admin / loterias2024` · `demo / demo123`
+
+### CLI (optional)
 ```bash
-# Demonstração completa (padrão)
 python run.py demo
-
-# Gerar jogos
 python run.py gerar --metodo score --dezenas 15 --jogos 5
-
-# Simulação Monte Carlo
 python run.py simular --n 1000
-
-# Testes estatísticos
 python run.py testar
 ```
 
-The Replit workflow runs `python run.py demo` by default.
+### API endpoints
+| Endpoint | Descrição |
+|---|---|
+| `GET /api/analise` | Frequência, atraso e score |
+| `GET /api/gerar?metodo=score&dezenas=15&jogos=5` | Gerar jogos |
+| `GET /api/simular?n=1000` | Monte Carlo |
+| `GET /api/testes` | Qui-quadrado, KS, Runs |
 
 ## Project structure
 
