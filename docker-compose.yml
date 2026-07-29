@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: loterias-app
+    volumes:
+      - ./data:/app/data
+      - ./core:/app/core
+    environment:
+      - PYTHONPATH=/app
+    command: python run.py demo
+
+  # Descomente para usar com banco de dados:
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: loterias-db
+  #   environment:
+  #     POSTGRES_DB: loterias
+  #     POSTGRES_USER: loterias
+  #     POSTGRES_PASSWORD: loterias123
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: loterias-redis
+  #   ports:
+  #     - "6379:6379"
+
+# volumes:
+#   postgres_data:

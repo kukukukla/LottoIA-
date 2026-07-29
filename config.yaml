@@ -1,0 +1,52 @@
+# Configuração do Motor Estatístico de Loterias
+
+app:
+  name: "Lotérias Inteligência"
+  version: "2.0.0"
+  debug: false
+
+loterias:
+  lotofacil:
+    dezenas_totais: 25
+    dezenas_sorteadas: 15
+    minimo_aposta: 15
+    maximo_aposta: 20
+  mega_sena:
+    dezenas_totais: 60
+    dezenas_sorteadas: 6
+    minimo_aposta: 6
+    maximo_aposta: 15
+  lotomania:
+    dezenas_totais: 100
+    dezenas_sorteadas: 20
+    minimo_aposta: 50
+    maximo_aposta: 50
+
+estatisticas:
+  janelas_frequencia: [10, 25, 50, 100, 300]
+  percentis: [25, 50, 75, 90, 95]
+
+score:
+  pesos_padrao:
+    frequencia_absoluta: 0.15
+    frequencia_recente: 0.20
+    atraso_atual: 0.20
+    atraso_relativo: 0.15
+    tendencia: 0.10
+    correlacao: 0.10
+    ciclos: 0.10
+
+genetico:
+  tamanho_populacao: 100
+  taxa_mutacao: 0.15
+  taxa_crossover: 0.80
+  elitismo: 5
+  max_geracoes: 50
+
+ml:
+  modelos_disponiveis: ["random_forest", "gradient_boosting", "logistic"]
+  n_estimators: 50
+  max_depth: 5
+
+relatorios:
+  formatos_exportacao: ["json", "csv"]
