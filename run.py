@@ -18,13 +18,10 @@ Exemplos:
     python run.py testar
 """
 
-import sys
 import argparse
 import random
 import numpy as np
 from datetime import date, timedelta
-
-sys.path.insert(0, 'core')
 
 from core.models import Concurso, LoteriaTipo, EstrategiaConfig
 from core.main_engine import MotorPrincipal
@@ -99,7 +96,7 @@ def cmd_demo(args):
     # Testes
     print("\n📐 TESTES DE ALEATORIEDADE")
     chi = motor.comparativo.teste_chi_quadrado(concursos)
-    print(f"   Qui-Quadrado: p={chi['p_value']:.4f} → {chi['interpretacao']}")
+    print(f"   Qui-Quadrado: p={chi['p_value']:.4f} → {chi.get('interpretacao', chi.get('conclusao', ''))}")
 
     print("\n" + "=" * 70)
     print("  ✅ DEMONSTRAÇÃO CONCLUÍDA")
@@ -149,20 +146,20 @@ def cmd_testar(args):
 
     chi = motor.comparativo.teste_chi_quadrado(concursos)
     print(f"\n1. Qui-Quadrado:")
-    print(f"   χ² = {chi['chi2']}")
-    print(f"   p-value = {chi['p_value']}")
-    print(f"   → {chi['conclusao']}")
+    print(f"   χ² = {chi.get('chi2', '')}")
+    print(f"   p-value = {chi.get('p_value', '')}")
+    print(f"   → {chi.get('conclusao', chi.get('interpretacao', ''))}")
 
     ks = motor.comparativo.teste_ks(concursos)
     print(f"\n2. Kolmogorov-Smirnov:")
-    print(f"   Estatística = {ks['statistic']}")
-    print(f"   p-value = {ks['p_value']}")
-    print(f"   → {ks['interpretacao']}")
+    print(f"   Estatística = {ks.get('statistic', '')}")
+    print(f"   p-value = {ks.get('p_value', '')}")
+    print(f"   → {ks.get('interpretacao', '')}")
 
     runs = motor.comparativo.teste_runs(concursos, 1)
     print(f"\n3. Teste de Runs (Dezena 1):")
-    print(f"   z-score = {runs['z_score']}")
-    print(f"   → {runs['interpretacao']}")
+    print(f"   z-score = {runs.get('z_score', '')}")
+    print(f"   → {runs.get('interpretacao', '')}")
 
 
 def main():
