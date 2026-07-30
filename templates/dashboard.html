@@ -3,274 +3,363 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard — Motor Estatístico de Loterias</title>
+  <title>LottoIA — Dashboard</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
-<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
-<aside class="sidebar">
+<!-- ══════════════════════════════════════════
+     TOPBAR NAV
+══════════════════════════════════════════ -->
+<nav class="topbar-nav">
+  <a class="nav-logo" href="/dashboard">
+    <div class="nav-logo-img">
+      <img src="/static/images/logo_brand.png" alt="Z"
+           style="width:28px;height:28px;object-fit:cover;object-position:0% center;border-radius:6px;">
+    </div>
+    <span class="nav-logo-text">LottoIA</span>
+  </a>
 
-  <div class="sidebar-logo">
-    <!-- LOGO SIDEBAR — substitua por <img src="/static/images/logo.png"> -->
-    <div class="sidebar-logo-img" id="sidebarLogo">
-      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48
-        10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4
-        0h-2V8h2v8z"/></svg>
-    </div>
-    <div class="sidebar-brand">
-      <!-- NOME DA MARCA — edite aqui -->
-      <div class="name">LotoIA</div>
-      <div class="version">v2.0 Pro</div>
-    </div>
+  <div class="nav-links">
+    <button class="nav-link active" onclick="showSection('analise',this)">Dashboard</button>
+    <button class="nav-link" onclick="showSection('gerar',this)">Predições IA</button>
+    <button class="nav-link" onclick="showSection('monte',this)">Monte Carlo</button>
+    <button class="nav-link" onclick="showSection('testes',this)">Testes</button>
   </div>
 
-  <nav class="sidebar-nav">
-    <div class="nav-section">Principal</div>
-
-    <button class="nav-item active" onclick="showSection('analise', this)">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4
-                 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
-      </svg>
-      Análise Estatística
-    </button>
-
-    <button class="nav-item" onclick="showSection('gerar', this)">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48
-                 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45
-                 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41
-                 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4
-                 4c0 .88-.36 1.68-.93 2.25z"/>
-      </svg>
-      Gerar Jogos
-    </button>
-
-    <button class="nav-item" onclick="showSection('monte', this)">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2
-                 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7
-                 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07
-                 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64
-                 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
-      </svg>
-      Monte Carlo
-    </button>
-
-    <button class="nav-item" onclick="showSection('testes', this)">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-      </svg>
-      Testes Estatísticos
-    </button>
-
-  </nav>
-
-  <div class="sidebar-footer">
-    <div class="user-badge">
-      <div class="avatar">{{ user[0]|upper }}</div>
-      <div>
-        <div class="uname">{{ user }}</div>
-        <div class="urole">Analista</div>
-      </div>
+  <div class="nav-right">
+    <div class="nav-user">
+      <div class="nav-avatar">{{ user[0]|upper }}</div>
+      <span style="color:var(--text-dim);font-size:12px">{{ user }}</span>
     </div>
-    <a href="/logout">
-      <button class="btn-logout">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-          <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58
-                   2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0
-                   1.1.9 2 2 2h8v-2H4V5z"/>
-        </svg>
-        Sair
-      </button>
+    <a href="/logout" style="text-decoration:none">
+      <button class="btn-sair">Sair</button>
     </a>
   </div>
-</aside>
+</nav>
 
-<!-- ══════════════════════ MAIN ══════════════════════ -->
-<main class="main">
+<!-- ══════════════════════════════════════════
+     APP BODY
+══════════════════════════════════════════ -->
+<div class="app-body">
 
-  <!-- ── ANÁLISE ESTATÍSTICA ── -->
-  <section id="sec-analise" class="section active">
-    <div class="topbar">
-      <div>
-        <div class="page-title">📊 Análise Estatística</div>
-        <div class="page-sub">Frequência, atraso e score das dezenas — Lotofácil</div>
+  <!-- LEFT SIDEBAR -->
+  <aside class="left-sidebar">
+    <div class="sidebar-section-title">Loterias Disponíveis</div>
+
+    <div class="lottery-item active" onclick="selectLottery(this,'Mega-Sena')">
+      <div class="lottery-item-left">
+        <div class="lottery-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+        </div>
+        <span class="lottery-name">Mega-Sena</span>
       </div>
-      <button class="btn btn-primary" onclick="loadAnalise()">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-          <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42
-                   0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73
-                   0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0
-                   0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66
-                   0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-        </svg>
-        Atualizar
-      </button>
+      <div class="toggle-dot"></div>
     </div>
 
-    <div class="stats-row" id="statsRow">
-      <div class="stat-card"><div class="stat-label">Concursos analisados</div><div class="stat-value green" id="st-concursos">—</div></div>
-      <div class="stat-card"><div class="stat-label">Soma média</div><div class="stat-value gold" id="st-soma">—</div></div>
-      <div class="stat-card"><div class="stat-label">Desvio padrão soma</div><div class="stat-value blue" id="st-desvio">—</div></div>
-      <div class="stat-card"><div class="stat-label">P25 / P75</div><div class="stat-value" id="st-p25p75">—</div></div>
+    <div class="lottery-item" onclick="selectLottery(this,'Quina')">
+      <div class="lottery-item-left">
+        <div class="lottery-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+        </div>
+        <span class="lottery-name">Quina</span>
+      </div>
+      <div class="toggle-dot"></div>
     </div>
 
-    <div class="grid-2">
-      <div class="card">
+    <div class="lottery-item" onclick="selectLottery(this,'Lotofácil')">
+      <div class="lottery-item-left">
+        <div class="lottery-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+        </div>
+        <span class="lottery-name">Lotofácil</span>
+      </div>
+      <div class="toggle-dot"></div>
+    </div>
+
+    <div class="lottery-item" onclick="selectLottery(this,'Lotomania')">
+      <div class="lottery-item-left">
+        <div class="lottery-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+        </div>
+        <span class="lottery-name">Lotomania</span>
+      </div>
+      <div class="toggle-dot"></div>
+    </div>
+
+    <div class="lottery-item" onclick="selectLottery(this,'Timemania')">
+      <div class="lottery-item-left">
+        <div class="lottery-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+        </div>
+        <span class="lottery-name">Timemania</span>
+      </div>
+      <div class="toggle-dot"></div>
+    </div>
+
+    <div class="lottery-item" onclick="selectLottery(this,'Dia de Sorte')">
+      <div class="lottery-item-left">
+        <div class="lottery-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+        </div>
+        <span class="lottery-name">Dia de Sorte</span>
+      </div>
+      <div class="toggle-dot"></div>
+    </div>
+
+    <div class="lottery-item" onclick="selectLottery(this,'+Milionária')">
+      <div class="lottery-item-left">
+        <div class="lottery-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+        </div>
+        <span class="lottery-name">+Milionária</span>
+      </div>
+      <div class="toggle-dot"></div>
+    </div>
+
+    <div class="sidebar-circuit"></div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- ── SEÇÃO: ANÁLISE / DASHBOARD ── -->
+    <section id="sec-analise" class="section active">
+
+      <!-- Prediction cards row -->
+      <div class="card" style="margin-bottom:14px">
         <div class="card-header">
-          <div class="card-title">
-            <svg viewBox="0 0 24 24" fill="var(--green)" width="18" height="18">
-              <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66
-                       5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3
-                       3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66
-                       5 8 5C6.34 5 5 6.34 5 8s1.34 3 3
-                       3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8
-                       0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97
-                       3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-            </svg>
-            Top 10 — Mais Frequentes
+          <div class="card-title" style="margin-bottom:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--neon)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Análise IA Principal
+          </div>
+          <button class="btn btn-outline" style="font-size:11px" onclick="loadAnalise()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            Atualizar
+          </button>
+        </div>
+        <div class="pred-cards">
+          <div class="pred-card active">
+            <div class="pred-icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg></div>
+            <div class="pred-name">Mega-Sena</div>
+            <div class="pred-sub">Análise 1</div>
+          </div>
+          <div class="pred-card">
+            <div class="pred-icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg></div>
+            <div class="pred-name">Quina</div>
+            <div class="pred-sub">Análise 2</div>
+          </div>
+          <div class="pred-card">
+            <div class="pred-icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg></div>
+            <div class="pred-name">Lotofácil</div>
+            <div class="pred-sub">Análise 3</div>
+          </div>
+          <div class="pred-card">
+            <div class="pred-icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg></div>
+            <div class="pred-name">Lotomania</div>
+            <div class="pred-sub">Análise 4</div>
+          </div>
+          <div class="pred-card">
+            <div class="pred-icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg></div>
+            <div class="pred-name">+Milionária</div>
+            <div class="pred-sub">Análise 5</div>
           </div>
         </div>
-        <div id="tbl-freq"><div class="loading-state"><span class="spinner"></span></div></div>
       </div>
 
+      <!-- Stats row -->
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card green"><div class="stat-label">Concursos</div><div class="stat-value green" id="st-concursos">—</div></div>
+        <div class="stat-card gold"><div class="stat-label">Soma Média</div><div class="stat-value gold" id="st-soma">—</div></div>
+        <div class="stat-card blue"><div class="stat-label">Desvio Padrão</div><div class="stat-value blue" id="st-desvio">—</div></div>
+        <div class="stat-card"><div class="stat-label">P25 / P75</div><div class="stat-value" id="st-p25p75" style="font-size:16px">—</div></div>
+      </div>
+
+      <!-- Freq + Score -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--neon)"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            Top 10 — Frequência
+          </div>
+          <div id="tbl-freq"><div class="loading-state"><span class="spinner"></span><span>Carregando…</span></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--gold)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Top 10 — Score IA
+          </div>
+          <div id="tbl-score"><div class="loading-state"><span class="spinner"></span><span>Carregando…</span></div></div>
+        </div>
+      </div>
+
+      <!-- Atraso full width -->
+      <div class="card">
+        <div class="card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--blue)"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.45 7.77 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.92 4.53 4.92.42-3.73 3.23L16.23 18z"/></svg>
+          Dezenas Mais Atrasadas
+        </div>
+        <div id="tbl-atraso"><div class="loading-state"><span class="spinner"></span><span>Carregando…</span></div></div>
+      </div>
+    </section>
+
+    <!-- ── SEÇÃO: GERAR JOGOS ── -->
+    <section id="sec-gerar" class="section">
+      <div class="card">
+        <div class="card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--neon)"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+          Gerar Jogos — Predições IA
+        </div>
+        <div class="controls" style="margin-bottom:20px">
+          <div class="ctrl-group">
+            <label>Método</label>
+            <select id="g-metodo">
+              <option value="aleatorio">Aleatório</option>
+              <option value="score" selected>Score IA</option>
+              <option value="frequencia">Frequência</option>
+              <option value="atraso">Atraso</option>
+              <option value="balanceado">Balanceado</option>
+              <option value="fibonacci">Fibonacci</option>
+            </select>
+          </div>
+          <div class="ctrl-group">
+            <label>Dezenas</label>
+            <input type="number" id="g-dezenas" value="15" min="15" max="20">
+          </div>
+          <div class="ctrl-group">
+            <label>Jogos</label>
+            <input type="number" id="g-jogos" value="6" min="1" max="20">
+          </div>
+          <button class="btn btn-primary" onclick="gerarJogos()" id="btn-gerar">
+            ⚡ Gerar
+          </button>
+        </div>
+        <div class="card-title" style="margin-bottom:12px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--neon)"><circle cx="12" cy="12" r="10"/></svg>
+          Jogos Gerados — <span id="g-metodo-label" style="color:var(--text-dim);font-size:12px;font-weight:400"></span>
+        </div>
+        <div id="jogos-output">
+          <div class="loading-state" style="color:var(--text-dim)">Configure os parâmetros e clique em Gerar.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SEÇÃO: MONTE CARLO ── -->
+    <section id="sec-monte" class="section">
+      <div class="card">
+        <div class="card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--neon)"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+          Simulação Monte Carlo
+        </div>
+        <div class="controls" style="margin-bottom:20px">
+          <div class="ctrl-group">
+            <label>Simulações</label>
+            <input type="number" id="mc-n" value="1000" min="100" max="10000" step="100">
+          </div>
+          <button class="btn btn-primary" onclick="simular()" id="btn-mc">▶ Executar</button>
+        </div>
+        <div id="mc-resumo">
+          <div class="loading-state" style="color:var(--text-dim)">Aguardando simulação…</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--neon)"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+          Distribuição de Acertos
+        </div>
+        <div id="mc-dist">
+          <div class="loading-state" style="color:var(--text-dim)">Aguardando simulação…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SEÇÃO: TESTES ── -->
+    <section id="sec-testes" class="section">
       <div class="card">
         <div class="card-header">
-          <div class="card-title">
-            <svg viewBox="0 0 24 24" fill="var(--gold)" width="18" height="18">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87
-                       1.18 6.88L12 17.77l-6.18 3.25L7
-                       14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-            Top 10 — Score Composto
+          <div class="card-title" style="margin-bottom:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--neon)"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            Testes Estatísticos de Aleatoriedade
+          </div>
+          <button class="btn btn-primary" onclick="rodarTestes()" id="btn-testes">
+            ▶ Executar
+          </button>
+        </div>
+        <div id="testes-output">
+          <div class="loading-state" style="color:var(--text-dim)">
+            Clique em "Executar" para rodar os testes Qui-Quadrado, KS e Runs.
           </div>
         </div>
-        <div id="tbl-score"><div class="loading-state"><span class="spinner"></span></div></div>
       </div>
+    </section>
 
-      <div class="card" style="grid-column:1/-1">
-        <div class="card-header">
-          <div class="card-title">
-            <svg viewBox="0 0 24 24" fill="var(--blue)" width="18" height="18">
-              <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47
-                       10 9.99 10C17.52 22 22 17.52 22 12S17.52
-                       2 11.99 2zm4.24 16L12 15.45 7.77 18l1.12-4.81-3.73-3.23
-                       4.92-.42L12 5l1.92 4.53 4.92.42-3.73 3.23L16.23 18z"/>
-            </svg>
-            Top 10 — Mais Atrasadas
-          </div>
-        </div>
-        <div id="tbl-atraso"><div class="loading-state"><span class="spinner"></span></div></div>
-      </div>
-    </div>
-  </section>
+  </main>
 
-  <!-- ── GERAR JOGOS ── -->
-  <section id="sec-gerar" class="section">
-    <div class="topbar">
-      <div>
-        <div class="page-title">🎲 Gerar Jogos</div>
-        <div class="page-sub">Crie combinações usando diferentes métodos estatísticos</div>
-      </div>
+  <!-- RIGHT PANEL -->
+  <aside class="right-panel">
+
+    <!-- Mascot -->
+    <div style="text-align:center;margin-bottom:16px">
+      <img src="/static/images/robot_face.png" alt="LottoIA Bot"
+           style="width:100%;max-width:220px;border-radius:12px;
+                  border:1px solid var(--border2);
+                  box-shadow:0 0 24px rgba(57,255,20,.2),0 0 60px rgba(57,255,20,.06);">
     </div>
 
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-title" style="margin-bottom:16px">Parâmetros</div>
-      <div class="controls">
-        <div class="ctrl-group">
-          <label>Método</label>
-          <select id="g-metodo">
-            <option value="aleatorio">Aleatório</option>
-            <option value="score" selected>Score</option>
-            <option value="frequencia">Frequência</option>
-            <option value="atraso">Atraso</option>
-            <option value="balanceado">Balanceado</option>
-            <option value="fibonacci">Fibonacci</option>
-          </select>
-        </div>
-        <div class="ctrl-group">
-          <label>Dezenas por jogo</label>
-          <input type="number" id="g-dezenas" value="15" min="15" max="20">
-        </div>
-        <div class="ctrl-group">
-          <label>Quantidade de jogos</label>
-          <input type="number" id="g-jogos" value="6" min="1" max="20">
-        </div>
-        <button class="btn btn-primary" onclick="gerarJogos()" id="btn-gerar">
-          🎲 Gerar
-        </button>
-      </div>
+    <!-- Dicas da IA -->
+    <div class="panel-title">Dicas da IA</div>
+
+    <div class="tip-card">
+      🤖 Dezenas com maior score composto tendem a aparecer em ciclos de 8–12 concursos.
+    </div>
+    <div class="tip-card">
+      📊 Frequência absoluta acima da média estatística indica dezena "quente" no período.
+    </div>
+    <div class="tip-card">
+      ⏱ Dezenas com atraso &gt; 3 sorteios têm probabilidade de retorno elevada.
     </div>
 
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Jogos Gerados</div>
-        <span id="g-metodo-label" style="font-size:12px;color:var(--text-dim)"></span>
-      </div>
-      <div id="jogos-output">
-        <div style="color:var(--text-dim);font-size:13px;text-align:center;padding:32px">
-          Configure os parâmetros acima e clique em Gerar.
-        </div>
-      </div>
-    </div>
-  </section>
+    <!-- Predição rápida -->
+    <div class="panel-title" style="margin-top:16px">Predição Rápida</div>
 
-  <!-- ── MONTE CARLO ── -->
-  <section id="sec-monte" class="section">
-    <div class="topbar">
-      <div>
-        <div class="page-title">🎰 Simulação Monte Carlo</div>
-        <div class="page-sub">Backtest probabilístico com N simulações aleatórias</div>
-      </div>
-    </div>
+    <select class="lottery-select" id="panel-lottery">
+      <option>Lotofácil</option>
+      <option>Mega-Sena</option>
+      <option>Quina</option>
+    </select>
 
-    <div class="card" style="margin-bottom:20px">
-      <div class="controls">
-        <div class="ctrl-group">
-          <label>Número de simulações</label>
-          <input type="number" id="mc-n" value="1000" min="100" max="10000" step="100">
-        </div>
-        <button class="btn btn-primary" onclick="simular()" id="btn-mc">
-          ▶ Executar
-        </button>
-      </div>
-    </div>
+    <div class="num-grid" id="numGrid"></div>
 
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title" style="margin-bottom:16px">Resumo</div>
-        <div id="mc-resumo" style="color:var(--text-dim);font-size:13px">Aguardando simulação…</div>
-      </div>
-      <div class="card">
-        <div class="card-title" style="margin-bottom:16px">Distribuição de Acertos</div>
-        <div id="mc-dist" style="color:var(--text-dim);font-size:13px">Aguardando simulação…</div>
-      </div>
-    </div>
-  </section>
+    <button class="btn-apostar" onclick="gerarRapido()">⚡ Gerar Jogo</button>
 
-  <!-- ── TESTES ESTATÍSTICOS ── -->
-  <section id="sec-testes" class="section">
-    <div class="topbar">
-      <div>
-        <div class="page-title">📐 Testes Estatísticos</div>
-        <div class="page-sub">Qui-Quadrado, Kolmogorov-Smirnov e Teste de Runs</div>
-      </div>
-      <button class="btn btn-primary" onclick="rodarTestes()" id="btn-testes">
-        ▶ Executar Testes
-      </button>
-    </div>
+  </aside>
 
-    <div id="testes-output">
-      <div style="color:var(--text-dim);font-size:13px;text-align:center;padding:40px">
-        Clique em "Executar Testes" para rodar os três testes de aleatoriedade.
-      </div>
-    </div>
-  </section>
-
-</main>
+</div><!-- end app-body -->
 
 <script src="/static/js/dashboard.js"></script>
+<script>
+  // Build number grid
+  const grid = document.getElementById('numGrid');
+  for (let i = 1; i <= 25; i++) {
+    const c = document.createElement('div');
+    c.className = 'num-cell';
+    c.textContent = String(i).padStart(2,'0');
+    c.onclick = () => c.classList.toggle('selected');
+    grid.appendChild(c);
+  }
+
+  function gerarRapido() {
+    document.querySelectorAll('.num-cell').forEach(c => c.classList.remove('selected'));
+    const cells = Array.from(document.querySelectorAll('.num-cell'));
+    const picks = cells.sort(() => Math.random() - .5).slice(0, 15);
+    picks.forEach(c => c.classList.add('selected'));
+  }
+
+  function selectLottery(el, name) {
+    document.querySelectorAll('.lottery-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  }
+</script>
 </body>
 </html>

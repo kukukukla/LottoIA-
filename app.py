@@ -11,7 +11,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -83,6 +83,10 @@ async def login(request: Request, username: str = Form(...), password: str = For
     return templates.TemplateResponse(request, "login.html", {
         "error": "Usuário ou senha incorretos."
     })
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("static/images/logo_brand.png", media_type="image/png")
 
 @app.get("/logout")
 async def logout(request: Request):

@@ -3,62 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — Motor Estatístico de Loterias</title>
+  <title>LottoIA — Acesso</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    /* Extra circuit lines on login bg */
+    .login-wrap::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cg fill='none' stroke='%2339ff14' stroke-width='.5' opacity='.06'%3E%3Cline x1='0' y1='200' x2='100' y2='200'/%3E%3Cline x1='100' y1='200' x2='100' y2='100'/%3E%3Cline x1='100' y1='100' x2='200' y2='100'/%3E%3Cline x1='300' y1='400' x2='300' y2='280'/%3E%3Cline x1='300' y1='280' x2='380' y2='280'/%3E%3Cline x1='380' y1='280' x2='380' y2='200'/%3E%3Ccircle cx='100' cy='200' r='4' fill='%2339ff14'/%3E%3Ccircle cx='100' cy='100' r='4' fill='%2339ff14'/%3E%3Ccircle cx='300' cy='280' r='4' fill='%2339ff14'/%3E%3C/g%3E%3C/svg%3E");
+      background-size: 400px 400px;
+      pointer-events: none;
+      z-index: -1;
+    }
+  </style>
 </head>
 <body>
 <div class="login-wrap">
   <div class="login-card">
 
-    <!-- ╔══════════════════════════════════════╗
-         ║  ÁREA DE LOGO E MARCA                ║
-         ║  Substitua o bloco abaixo pela sua   ║
-         ║  imagem de logo real.                ║
-         ╚══════════════════════════════════════╝ -->
     <div class="logo-area">
-      <div class="logo-placeholder" id="logoContainer">
-        <!--
-          PARA ADICIONAR SEU LOGO:
-          Substitua o conteúdo abaixo por:
-          <img src="/static/images/logo.png" alt="Logo">
-        -->
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48
-                   10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
-        </svg>
-        <span class="logo-hint">Logo</span>
+      <!-- Logo Z (circuit-board) extraído da imagem da marca -->
+      <div class="logo-img-wrap">
+        <img src="/static/images/logo_brand.png" alt="LottoIA Logo"
+             style="width:90px;height:90px;object-fit:cover;object-position:0% center;border-radius:12px;filter:drop-shadow(0 0 12px #39ff14);">
       </div>
-
-      <!--
-        NOME DA MARCA — edite aqui:
-      -->
-      <div class="brand-name">⚡ LotoIA</div>
-      <div class="brand-tagline">Motor Estatístico de Loterias v2.0</div>
+      <div class="brand-name">LottoIA</div>
+      <div class="brand-tagline">Motor Estatístico de Inteligência</div>
     </div>
+
+    {% if error %}
+    <div class="error-msg">⚠ {{ error }}</div>
+    {% endif %}
 
     <div class="login-title">Acesso ao Sistema</div>
 
-    {% if error %}
-    <div class="error-msg">{{ error }}</div>
-    {% endif %}
-
-    <form method="post" action="/login" autocomplete="off">
+    <form method="post" action="/login">
       <div class="form-group">
         <label for="username">Usuário</label>
         <input type="text" id="username" name="username"
-               placeholder="Digite seu usuário" required autofocus>
+               placeholder="Digite seu usuário" required autofocus autocomplete="username">
       </div>
       <div class="form-group">
         <label for="password">Senha</label>
         <input type="password" id="password" name="password"
-               placeholder="Digite sua senha" required>
+               placeholder="••••••••" required autocomplete="current-password">
       </div>
-      <button class="btn-login" type="submit">Entrar</button>
+      <button class="btn-login" type="submit">⚡ Entrar</button>
     </form>
 
-    <!-- Credenciais de teste (remova em produção) -->
     <div class="demo-creds">
-      <strong>🔑 Credenciais de teste:</strong><br>
+      <strong>🔑 Credenciais de acesso:</strong><br>
       admin / loterias2024 &nbsp;·&nbsp; demo / demo123
     </div>
 
