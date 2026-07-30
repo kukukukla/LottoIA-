@@ -35,16 +35,16 @@ templates = Jinja2Templates(directory="templates")
 # ──────────────────────────────────────────────
 # Credentials — loaded from environment Secrets
 # ──────────────────────────────────────────────
-_ADMIN_USER = os.environ.get("ADMIN_USERNAME", "")
-_ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "")
+_ADMIN_USER = os.environ.get("ADMIN_USERNAME", "").strip()
+_ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "").strip()
 
+import logging as _logging
+_log = _logging.getLogger("lottoia.auth")
 if not _ADMIN_USER or not _ADMIN_PASS:
-    import warnings
-    warnings.warn(
-        "ADMIN_USERNAME ou ADMIN_PASSWORD não definidos nos Secrets. "
-        "Nenhum login será aceito.",
-        RuntimeWarning,
-    )
+    _log.error("ADMIN_USERNAME ou ADMIN_PASSWORD ausentes nos Secrets — nenhum login será aceito.")
+else:
+    _log.info("Credenciais carregadas: ADMIN_USERNAME=%d chars, ADMIN_PASSWORD=%d chars",
+              len(_ADMIN_USER), len(_ADMIN_PASS))
 
 # Brute-force protection: track failed attempts per IP
 _FAILED: dict = defaultdict(lambda: {"count": 0, "lockout_until": None})
@@ -57,7 +57,7 @@ def _check_credentials(username: str, password: str) -> bool:
     if not _ADMIN_USER or not _ADMIN_PASS:
         return False
     user_ok = _secrets.compare_digest(username.strip(), _ADMIN_USER)
-    pass_ok = _secrets.compare_digest(password, _ADMIN_PASS)
+    pass_ok = _secrets.compare_digest(password.strip(), _ADMIN_PASS)
     return user_ok and pass_ok
 
 # ──────────────────────────────────────────────
