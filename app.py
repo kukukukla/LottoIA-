@@ -5,10 +5,12 @@ FastAPI + Jinja2 + Session Auth
 """
 
 import os
+import secrets as _secrets
 import random
 import numpy as np
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from typing import Optional
+from collections import defaultdict
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
@@ -31,12 +33,32 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # ──────────────────────────────────────────────
-# Demo credentials (replace with DB in production)
+# Credentials — loaded from environment Secrets
 # ──────────────────────────────────────────────
-USERS = {
-    "admin": "loterias2024",
-    "demo":  "demo123",
-}
+_ADMIN_USER = os.environ.get("ADMIN_USERNAME", "")
+_ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "")
+
+if not _ADMIN_USER or not _ADMIN_PASS:
+    import warnings
+    warnings.warn(
+        "ADMIN_USERNAME ou ADMIN_PASSWORD não definidos nos Secrets. "
+        "Nenhum login será aceito.",
+        RuntimeWarning,
+    )
+
+# Brute-force protection: track failed attempts per IP
+_FAILED: dict = defaultdict(lambda: {"count": 0, "lockout_until": None})
+_MAX_ATTEMPTS = 5
+_LOCKOUT_SECONDS = 300  # 5 minutes
+
+
+def _check_credentials(username: str, password: str) -> bool:
+    """Constant-time comparison to prevent timing attacks."""
+    if not _ADMIN_USER or not _ADMIN_PASS:
+        return False
+    user_ok = _secrets.compare_digest(username.strip(), _ADMIN_USER)
+    pass_ok = _secrets.compare_digest(password, _ADMIN_PASS)
+    return user_ok and pass_ok
 
 # ──────────────────────────────────────────────
 # Helpers
@@ -77,11 +99,34 @@ async def login_page(request: Request):
 
 @app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    if USERS.get(username) == password:
+    ip = request.client.host if request.client else "unknown"
+    state = _FAILED[ip]
+
+    # Check lockout
+    if state["lockout_until"] and datetime.utcnow() < state["lockout_until"]:
+        remaining = int((state["lockout_until"] - datetime.utcnow()).total_seconds())
+        return templates.TemplateResponse(request, "login.html", {
+            "error": f"Muitas tentativas. Tente novamente em {remaining}s."
+        })
+
+    if _check_credentials(username, password):
+        # Reset failed counter on success
+        _FAILED[ip] = {"count": 0, "lockout_until": None}
         request.session["user"] = username
         return RedirectResponse("/dashboard", status_code=302)
+
+    # Increment failure counter
+    state["count"] += 1
+    if state["count"] >= _MAX_ATTEMPTS:
+        state["lockout_until"] = datetime.utcnow() + timedelta(seconds=_LOCKOUT_SECONDS)
+        state["count"] = 0
+        return templates.TemplateResponse(request, "login.html", {
+            "error": f"Conta bloqueada por {_LOCKOUT_SECONDS // 60} minutos após várias tentativas."
+        })
+
+    attempts_left = _MAX_ATTEMPTS - state["count"]
     return templates.TemplateResponse(request, "login.html", {
-        "error": "Usuário ou senha incorretos."
+        "error": f"Usuário ou senha incorretos. ({attempts_left} tentativa(s) restante(s))"
     })
 
 @app.get("/favicon.ico", include_in_schema=False)
