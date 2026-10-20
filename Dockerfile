@@ -15,6 +15,7 @@ COPY . .
 # Variáveis de ambiente
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+EXPOSE 5000
 
 # Comando padrão
-CMD ["python", "run.py", "demo"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000"]

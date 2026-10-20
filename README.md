@@ -17,17 +17,18 @@ Plataforma profissional de análise quantitativa para loterias brasileiras (Loto
 - [Estratégias Configuráveis](#-estratégias-configuráveis)
 - [Testes Estatísticos](#-testes-estatísticos)
 - [Deploy](#-deploy)
+- [Revisão técnica](REVISAO_TECNICA.md)
 - [Licença](#-licença)
 
 ---
 
 ## ✨ Funcionalidades
 
-- ✅ **12 Motores Especializados** — Análise multidimensional completa
-- ✅ **25+ Filtros de Estratégia** — Composição de jogos altamente configurável
-- ✅ **10 Métodos de Geração** — Aleatório, Score, Frequência, Atraso, Balanceado, Fibonacci, Genético, ML, etc.
+- ✅ **Motores estatísticos e matemáticos** — Análise de frequência, atraso, combinatória, padrões e séries temporais
+- ✅ **Filtros de estratégia** — Composição de jogos configurável
+- ✅ **Geração de jogos** — Aleatório, Score, Frequência, Atraso, Balanceado, Fibonacci, estratégias e desdobramentos
 - ✅ **Simulações Monte Carlo** — Backtests e comparação de estratégias
-- ✅ **Machine Learning** — Random Forest, Gradient Boosting, Logistic Regression
+- ✅ **Módulo de Machine Learning** — Implementação disponível em `motor_ml.py`
 - ✅ **Algoritmo Genético** — Evolução de jogos com fitness configurável
 - ✅ **Testes Estatísticos** — Qui-quadrado, Kolmogorov-Smirnov, Runs
 - ✅ **Análise Temporal** — Ciclos, momentum, sazonalidade, regressão
@@ -39,30 +40,23 @@ Plataforma profissional de análise quantitativa para loterias brasileiras (Loto
 ## 🏗️ Arquitetura
 
 ```
-loterias_inteligencia/
-├── core/           # 16 módulos Python (4.410 linhas)
-│   ├── models.py              # Entidades do domínio
-│   ├── main_engine.py         # Orquestrador principal
-│   ├── motor_estatistico.py   # Análise estatística
-│   ├── motor_matematico.py    # Combinatória e probabilidade
-│   ├── motor_simulacoes.py    # Monte Carlo e backtests
-│   ├── motor_estrategias.py   # 25+ filtros configuráveis
-│   ├── motor_score.py         # Pontuação de dezenas
-│   ├── motor_desdobramentos.py # Fechamentos matemáticos
-│   ├── motor_temporal.py      # Séries temporais
-│   ├── motor_ml.py            # Machine Learning
-│   ├── motor_padroes.py       # Padrões geométricos/numéricos
-│   ├── motor_comparativo.py   # Testes estatísticos
-│   ├── motor_genetico.py      # Algoritmo genético
-│   ├── motor_relatorios.py    # Exportação de dados
-│   └── gerador_jogos.py       # Gerador unificado
-├── scripts/        # Scripts de execução
-├── tests/          # Testes automatizados
-├── data/           # Dados históricos
-├── docs/           # Documentação e imagens
-├── config/         # Configurações
-└── notebooks/      # Jupyter notebooks
+LottoIA/
+├── app.py                    # Aplicação web FastAPI e autenticação por sessão
+├── run.py                    # CLI: demo, geração, simulação e testes estatísticos
+├── models.py                 # Entidades do domínio e tipos de loteria
+├── main_engine.py            # Orquestrador dos motores
+├── gerador_jogos.py          # Geração unificada de combinações
+├── motor_*.py                # Motores estatístico, matemático, temporal, ML etc.
+├── core/                     # Shims de compatibilidade e exports públicos
+├── templates/ + static/      # HTML, CSS, JavaScript e imagens do dashboard
+├── test_motores.py            # Testes pytest (inclui regressões)
+├── requirements.txt           # Dependências Python
+├── Dockerfile                 # Imagem que serve a aplicação web
+├── docker-compose.yml         # Serviço web; requer secrets no ambiente
+└── REVISAO_TECNICA.md         # Revisão, limitações, execução e desempenho
 ```
+
+Os módulos de implementação ficam na raiz; os módulos em `core/` reexportam os módulos legados. A aplicação e o CLI usam dados sintéticos na demonstração; não há carregamento automático de resultados oficiais.
 
 ---
 
@@ -77,23 +71,24 @@ loterias_inteligencia/
 
 ```bash
 # 1. Clone o repositório
-git clone <url-do-repositorio>
-cd loterias_inteligencia
+git clone https://github.com/kukukukla/LottoIA-.git
+cd LottoIA-
 
 # 2. Crie um ambiente virtual (recomendado)
-python -m venv venv
+python3 -m venv .venv
 
 # Ative o ambiente:
 # Windows:
-venv\Scripts\activate
+.venv\Scripts\activate
 # Linux/Mac:
-source venv/bin/activate
+source .venv/bin/activate
 
 # 3. Instale as dependências
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
-# 4. Execute a demonstração
-python scripts/demo.py
+# 4. Execute testes e demonstração
+python -m pytest -q
+python run.py demo
 ```
 
 ---
@@ -239,27 +234,19 @@ Resultados esperados para sorteios verdadeiramente aleatórios:
 
 ## 🐳 Deploy
 
-### Docker (recomendado)
+O container inicia a aplicação FastAPI na porta 5000. Configure as credenciais em um `.env` local (não versionado) antes de subir:
 
-```bash
-# Construir imagem
-docker build -t loterias-inteligencia .
-
-# Executar
-docker run -p 8000:8000 loterias-inteligencia
+```dotenv
+SESSION_SECRET=gere-um-segredo-aleatorio-longo
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=senha-forte
 ```
 
-### Docker Compose
-
 ```bash
-docker-compose up -d
+docker compose up --build -d
 ```
 
-Serviços incluídos:
-- **API** (FastAPI) na porta 8000
-- **PostgreSQL** na porta 5432
-- **Redis** na porta 6379
-- **Frontend** (React) na porta 3000
+O Compose atual contém somente o serviço web. As configurações de PostgreSQL e Redis no YAML estão comentadas; não há frontend React configurado neste repositório. Em produção atrás de TLS, configure `SESSION_HTTPS_ONLY=true` no ambiente do serviço.
 
 ---
 
@@ -267,19 +254,17 @@ Serviços incluídos:
 
 ```bash
 # Executar todos os testes
-pytest tests/ -v
-
-# Com cobertura
-pytest tests/ --cov=core --cov-report=html
+python -m pytest -q
 ```
 
 ---
 
 ## 📚 Documentação
 
-- `docs/RESUMO_SISTEMA.txt` — Documentação técnica completa
-- `docs/dashboard_demo.png` — Screenshots do dashboard
-- `notebooks/` — Jupyter notebooks com exemplos
+- [Revisão técnica](REVISAO_TECNICA.md) — arquitetura, lógica, validações, limitações, desempenho medido e instruções
+- `RESUMO_SISTEMA.txt` — Resumo do sistema
+- `exemplo_completo.ipynb` — Notebook de exemplo
+- `dashboard_demo_2.png` — Imagem demonstrativa do dashboard
 
 ---
 

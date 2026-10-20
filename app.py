@@ -5,6 +5,7 @@ FastAPI + Jinja2 + Session Auth
 """
 
 import os
+import logging as _logging
 import secrets as _secrets
 import random
 import numpy as np
@@ -12,7 +13,7 @@ from datetime import date, timedelta, datetime
 from typing import Optional
 from collections import defaultdict
 
-from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -26,8 +27,19 @@ from core.main_engine import MotorPrincipal
 # ──────────────────────────────────────────────
 app = FastAPI(title="Motor Estatístico de Loterias v2.0")
 
-SECRET_KEY = os.environ.get("SESSION_SECRET", "loteria-dev-secret-2024")
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+SECRET_KEY = os.environ.get("SESSION_SECRET") or _secrets.token_urlsafe(32)
+if not os.environ.get("SESSION_SECRET"):
+    _logging.getLogger("lottoia.auth").warning(
+        "SESSION_SECRET ausente; usando chave temporária. Defina um segredo estável em produção."
+    )
+_https_only = os.environ.get("SESSION_HTTPS_ONLY", "").lower() in {"1", "true", "yes"}
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    same_site="lax",
+    https_only=_https_only,
+    max_age=60 * 60 * 12,
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -36,9 +48,8 @@ templates = Jinja2Templates(directory="templates")
 # Credentials — loaded from environment Secrets
 # ──────────────────────────────────────────────
 _ADMIN_USER = os.environ.get("ADMIN_USERNAME", "").strip()
-_ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "").strip()
+_ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "")
 
-import logging as _logging
 _log = _logging.getLogger("lottoia.auth")
 if not _ADMIN_USER or not _ADMIN_PASS:
     _log.error("ADMIN_USERNAME ou ADMIN_PASSWORD ausentes nos Secrets — nenhum login será aceito.")
@@ -57,7 +68,7 @@ def _check_credentials(username: str, password: str) -> bool:
     if not _ADMIN_USER or not _ADMIN_PASS:
         return False
     user_ok = _secrets.compare_digest(username.strip(), _ADMIN_USER)
-    pass_ok = _secrets.compare_digest(password.strip(), _ADMIN_PASS)
+    pass_ok = _secrets.compare_digest(password, _ADMIN_PASS)
     return user_ok and pass_ok
 
 # ──────────────────────────────────────────────
@@ -112,6 +123,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
     if _check_credentials(username, password):
         # Reset failed counter on success
         _FAILED[ip] = {"count": 0, "lockout_until": None}
+        request.session.clear()
         request.session["user"] = username
         return RedirectResponse("/dashboard", status_code=302)
 
@@ -195,8 +207,8 @@ async def api_analise(request: Request):
 async def api_gerar(
     request: Request,
     metodo: str = "aleatorio",
-    dezenas: int = 15,
-    jogos: int = 5,
+    dezenas: int = Query(default=15, ge=15, le=20),
+    jogos: int = Query(default=5, ge=1, le=50),
 ):
     if not get_current_user(request):
         return JSONResponse({"error": "Não autenticado"}, status_code=401)
@@ -219,12 +231,9 @@ async def api_gerar(
 # API — Monte Carlo
 # ──────────────────────────────────────────────
 @app.get("/api/simular")
-async def api_simular(request: Request, n: int = 1000):
+async def api_simular(request: Request, n: int = Query(default=1000, ge=1, le=10000)):
     if not get_current_user(request):
         return JSONResponse({"error": "Não autenticado"}, status_code=401)
-
-    if n > 10000:
-        return JSONResponse({"error": "Máximo 10.000 simulações por requisição."}, status_code=400)
 
     concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
     motor = MotorPrincipal(concursos)

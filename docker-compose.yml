@@ -4,12 +4,16 @@ services:
   app:
     build: .
     container_name: loterias-app
+    ports:
+      - "5000:5000"
     volumes:
       - ./data:/app/data
-      - ./core:/app/core
     environment:
       - PYTHONPATH=/app
-    command: python run.py demo
+      - SESSION_SECRET=${SESSION_SECRET:?Defina SESSION_SECRET no ambiente}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:?Defina ADMIN_USERNAME no ambiente}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD no ambiente}
+    command: uvicorn app:app --host 0.0.0.0 --port 5000
 
   # Descomente para usar com banco de dados:
   # db:

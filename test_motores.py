@@ -1,9 +1,6 @@
 """
 Testes automatizados do Motor Estatístico de Loterias
 """
-import sys
-sys.path.insert(0, 'core')
-
 import pytest
 import random
 import numpy as np
@@ -102,6 +99,20 @@ class TestMotorScore:
         assert len(top) == 5
         assert top[0].score_total >= top[-1].score_total
 
+    def test_matriz_correlacao_calculada_uma_vez(self, monkeypatch):
+        score = MotorScore(gerar_concursos(10))
+        original = score.estatistico.matriz_correlacao
+        chamadas = 0
+
+        def contar_chamadas():
+            nonlocal chamadas
+            chamadas += 1
+            return original()
+
+        monkeypatch.setattr(score.estatistico, "matriz_correlacao", contar_chamadas)
+        score.calcular_scores()
+        assert chamadas == 1
+
 
 class TestMotorPrincipal:
     def test_resumo(self):
@@ -130,6 +141,23 @@ class TestMotorPrincipal:
         id_estr = motor.criar_estrategia(config)
         assert id_estr is not None
         assert motor.estrategias.obter_estrategia(id_estr) is not None
+
+
+class TestMotorSimulacoes:
+    def test_monte_carlo_respeita_quantidade_solicitada(self):
+        motor = MotorPrincipal(gerar_concursos(5))
+        relatorio = motor.simulacoes.monte_carlo_aleatorio(
+            n_simulacoes=12,
+            n_dezenas=15,
+            seed=42,
+        )
+        assert relatorio.total_simulacoes == 12
+        assert len(relatorio.detalhes) == 12
+
+    def test_monte_carlo_rejeita_quantidade_invalida(self):
+        motor = MotorPrincipal(gerar_concursos(5))
+        with pytest.raises(ValueError, match="inteiro positivo"):
+            motor.simulacoes.monte_carlo_aleatorio(n_simulacoes=0)
 
 
 if __name__ == "__main__":

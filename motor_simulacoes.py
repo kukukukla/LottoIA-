@@ -107,14 +107,25 @@ class MotorSimulacoes:
         Simulação Monte Carlo com jogos completamente aleatórios.
         Compara com o histórico real.
         """
-        if seed is not None:
-            np.random.seed(seed)
+        if not isinstance(n_simulacoes, int) or n_simulacoes < 1:
+            raise ValueError("n_simulacoes deve ser um inteiro positivo")
+        if self.loteria is None or not self.concursos:
+            raise ValueError("É necessário fornecer ao menos um concurso histórico")
+        n_dezenas = self.loteria.dezenas_sorteadas if n_dezenas is None else n_dezenas
+        if not isinstance(n_dezenas, int) or not 1 <= n_dezenas <= self.loteria.dezenas_totais:
+            raise ValueError(
+                f"n_dezenas deve estar entre 1 e {self.loteria.dezenas_totais}"
+            )
 
-        n_dezenas = n_dezenas or self.loteria.dezenas_sorteadas
+        rng = np.random.default_rng(seed)
         resultados = []
 
-        for c in self.concursos:
-            jogo = set(np.random.choice(
+        # Sample historical draws with replacement so the requested number of
+        # trials is honored even when it exceeds the available history.
+        indices = rng.integers(0, len(self.concursos), size=n_simulacoes)
+        for indice in indices:
+            c = self.concursos[int(indice)]
+            jogo = set(rng.choice(
                 range(1, self.loteria.dezenas_totais + 1),
                 size=n_dezenas,
                 replace=False

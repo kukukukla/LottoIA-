@@ -58,6 +58,11 @@ class MotorScore:
         freq_recente = self.estatistico.frequencia_por_janela(25)
         atraso_at = self.estatistico.atraso_atual()
         atraso_med = self.estatistico.atraso_medio()
+        matriz_correlacao = (
+            self.estatistico.matriz_correlacao()
+            if "correlacao" in pesos_normalizados
+            else None
+        )
 
         # Normaliza métricas para escala 0-1
         max_freq = max(freq_abs.values()) if freq_abs else 1
@@ -130,7 +135,7 @@ class MotorScore:
 
             # Correlação (co-ocorrência com dezenas quentes)
             if "correlacao" in pesos_normalizados:
-                corr = self._score_correlacao(d, freq_abs)
+                corr = self._score_correlacao(d, freq_abs, matriz_correlacao)
                 contribuicoes["correlacao"] = round(
                     corr * pesos_normalizados["correlacao"], 4
                 )
@@ -151,12 +156,18 @@ class MotorScore:
 
         return scores
 
-    def _score_correlacao(self, dezena: int, freq_abs: Dict[int, int]) -> float:
+    def _score_correlacao(
+        self,
+        dezena: int,
+        freq_abs: Dict[int, int],
+        matriz=None,
+    ) -> float:
         """Score de correlação com dezenas mais frequentes."""
         top_dezenas = sorted(freq_abs.items(), key=lambda x: x[1], reverse=True)[:10]
         top_set = {d for d, _ in top_dezenas}
 
-        matriz = self.estatistico.matriz_correlacao()
+        if matriz is None:
+            matriz = self.estatistico.matriz_correlacao()
         score = 0
         for td in top_set:
             if td != dezena:
