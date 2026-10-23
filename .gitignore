@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local CAIXA data cache (recreated by the importer)
+data/loterias/*.json
+data/loterias/*.tmp

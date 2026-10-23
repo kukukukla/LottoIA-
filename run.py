@@ -19,12 +19,14 @@ Exemplos:
 """
 
 import argparse
+import json
 import random
 import numpy as np
 from datetime import date, timedelta
 
 from core.models import Concurso, LoteriaTipo, EstrategiaConfig
 from core.main_engine import MotorPrincipal
+from caixa_client import CAIXA_CLIENT, CaixaAPIError
 
 
 def gerar_dados_teste(loteria: LoteriaTipo, n_concursos: int = 300) -> list:
@@ -43,6 +45,33 @@ def gerar_dados_teste(loteria: LoteriaTipo, n_concursos: int = 300) -> list:
             loteria=loteria
         ))
     return concursos
+
+
+def _carregar_dados_cli(args):
+    loteria = LoteriaTipo(args.loteria)
+    if args.fonte == "demo":
+        concursos = gerar_dados_teste(loteria, max(args.ultimos, 300))
+        metadata = {"fonte": "sintético/demo", "aviso": "Não são resultados oficiais."}
+        return loteria, concursos, metadata
+    try:
+        concursos, metadata = CAIXA_CLIENT.obter_historico(
+            loteria, args.ultimos, getattr(args, "atualizar", False)
+        )
+        return loteria, concursos, metadata
+    except (CaixaAPIError, ValueError) as exc:
+        raise SystemExit(f"Não foi possível carregar dados CAIXA: {exc}") from exc
+
+
+def _add_data_options(parser, default_fonte="demo", ultimos=30):
+    parser.add_argument(
+        "--fonte", choices=["caixa", "demo"], default=default_fonte,
+        help="Fonte dos concursos; 'demo' usa dados artificiais, 'caixa' consulta resultados oficiais.",
+    )
+    parser.add_argument(
+        "--loteria", choices=[item.value for item in LoteriaTipo], default="lotofacil"
+    )
+    parser.add_argument("--ultimos", type=int, default=ultimos, help="Quantidade de concursos históricos (1–300).")
+    parser.add_argument("--atualizar", action="store_true", help="Ignora cache recente e consulta a CAIXA.")
 
 
 def cmd_demo(args):
@@ -104,29 +133,32 @@ def cmd_demo(args):
 
 
 def cmd_gerar(args):
-    """Gera jogos pelo método especificado."""
-    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    """Gera jogos usando a fonte escolhida, demo por padrão ou CAIXA."""
+    loteria, concursos, metadata = _carregar_dados_cli(args)
+    dezenas = args.dezenas if args.dezenas is not None else loteria.minimo_aposta
+    if not loteria.minimo_aposta <= dezenas <= loteria.maximo_aposta:
+        raise SystemExit(
+            f"Para {loteria.value}, dezenas deve ficar entre "
+            f"{loteria.minimo_aposta} e {loteria.maximo_aposta}."
+        )
+    if not 1 <= args.jogos <= 50:
+        raise SystemExit("--jogos deve ficar entre 1 e 50.")
     motor = MotorPrincipal(concursos)
-
-    jogos = motor.gerar_jogos(
-        args.metodo,
-        n_dezenas=args.dezenas,
-        n_jogos=args.jogos
-    )
-
+    jogos = motor.gerar_jogos(args.metodo, n_dezenas=dezenas, n_jogos=args.jogos)
+    print(f"Fonte: {metadata['fonte']} | Loteria: {loteria.value} | Histórico: {len(concursos)}")
     print(f"\n🎲 Jogos gerados pelo método '{args.metodo}':")
-    for i, j in enumerate(jogos, 1):
-        print(f"   Jogo {i}: {j['dezenas']}")
+    for i, jogo in enumerate(jogos, 1):
+        print(f"   Jogo {i}: {jogo['dezenas']}")
 
 
 def cmd_simular(args):
-    """Executa simulação Monte Carlo."""
-    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    """Executa Monte Carlo sobre histórico CAIXA ou dados artificiais."""
+    loteria, concursos, metadata = _carregar_dados_cli(args)
+    if args.n < 1 or args.n > 1000000:
+        raise SystemExit("--n deve ficar entre 1 e 1.000.000.")
     motor = MotorPrincipal(concursos)
-
-    print(f"\n🎰 Executando Monte Carlo ({args.n} simulações)...")
-    rel = motor.simulacoes.monte_carlo_aleatorio(args.n, 15)
-
+    print(f"\n🎰 Monte Carlo ({args.n} simulações) | {metadata['fonte']} | {loteria.value}")
+    rel = motor.simulacoes.monte_carlo_aleatorio(args.n, loteria.dezenas_sorteadas)
     print(f"\n   Total: {rel.total_simulacoes}")
     print(f"   Média: {rel.media_acertos}")
     print(f"   Máx/Mín: {rel.max_acertos}/{rel.min_acertos}")
@@ -137,29 +169,42 @@ def cmd_simular(args):
 
 
 def cmd_testar(args):
-    """Executa testes estatísticos."""
-    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    """Executa testes estatísticos sobre a fonte escolhida."""
+    loteria, concursos, metadata = _carregar_dados_cli(args)
     motor = MotorPrincipal(concursos)
-
-    print("\n📐 TESTES ESTATÍSTICOS DE ALEATORIEDADE")
-    print("-" * 50)
-
+    print(f"\n📐 TESTES ESTATÍSTICOS | {metadata['fonte']} | {loteria.value} | {len(concursos)} concursos")
+    print("-" * 60)
     chi = motor.comparativo.teste_chi_quadrado(concursos)
-    print(f"\n1. Qui-Quadrado:")
-    print(f"   χ² = {chi.get('chi2', '')}")
-    print(f"   p-value = {chi.get('p_value', '')}")
-    print(f"   → {chi.get('conclusao', chi.get('interpretacao', ''))}")
-
     ks = motor.comparativo.teste_ks(concursos)
-    print(f"\n2. Kolmogorov-Smirnov:")
-    print(f"   Estatística = {ks.get('statistic', '')}")
-    print(f"   p-value = {ks.get('p_value', '')}")
-    print(f"   → {ks.get('interpretacao', '')}")
-
     runs = motor.comparativo.teste_runs(concursos, 1)
-    print(f"\n3. Teste de Runs (Dezena 1):")
-    print(f"   z-score = {runs.get('z_score', '')}")
-    print(f"   → {runs.get('interpretacao', '')}")
+    print(f"Qui-Quadrado: estatística={chi.get('chi2')}; p={chi.get('p_value')}; {chi.get('conclusao', chi.get('interpretacao', ''))}")
+    print(f"Kolmogorov-Smirnov: estatística={ks.get('statistic')}; p={ks.get('p_value')}; {ks.get('interpretacao', '')}")
+    print(f"Runs (dezena 1): z={runs.get('z_score')}; {runs.get('interpretacao', '')}")
+
+
+def cmd_resultados(args):
+    """Mostra concursos reais recentes consultados ou cacheados da CAIXA."""
+    loteria = LoteriaTipo(args.loteria)
+    try:
+        concursos, metadata = CAIXA_CLIENT.obter_historico(
+            loteria, args.ultimos, args.atualizar
+        )
+    except (CaixaAPIError, ValueError) as exc:
+        raise SystemExit(f"Não foi possível consultar resultados oficiais: {exc}") from exc
+    print(f"Fonte: {metadata['fonte']} | atualização: {metadata['atualizado_em']} | cache: {metadata['cache']}")
+    if metadata.get("aviso"):
+        print(f"Aviso: {metadata['aviso']}")
+    for item in concursos[-args.ultimos:]:
+        print(f"Concurso {item.numero} | {item.data.isoformat()} | {item.dezenas}")
+
+
+def cmd_analisar(args):
+    """Executa o fluxo integrado de estatística, tempo, padrões e aleatoriedade."""
+    loteria, concursos, metadata = _carregar_dados_cli(args)
+    motor = MotorPrincipal(concursos)
+    resultado = motor.analise_completa()
+    print(f"Fonte: {metadata['fonte']} | {loteria.value} | {len(concursos)} concursos | último #{concursos[-1].numero}")
+    print(json.dumps(resultado, ensure_ascii=False, indent=2, default=str))
 
 
 def main():
@@ -183,15 +228,27 @@ Exemplos:
     # gerar
     gerar_parser = subparsers.add_parser('gerar', help='Gerar jogos')
     gerar_parser.add_argument('--metodo', required=True, choices=['aleatorio', 'score', 'frequencia', 'atraso', 'balanceado', 'fibonacci'])
-    gerar_parser.add_argument('--dezenas', type=int, default=15)
+    gerar_parser.add_argument('--dezenas', type=int, default=None)
     gerar_parser.add_argument('--jogos', type=int, default=1)
+    _add_data_options(gerar_parser)
 
     # simular
     sim_parser = subparsers.add_parser('simular', help='Simulação Monte Carlo')
     sim_parser.add_argument('--n', type=int, default=1000, help='Número de simulações')
+    _add_data_options(sim_parser)
 
     # testar
-    subparsers.add_parser('testar', help='Testes estatísticos')
+    testar_parser = subparsers.add_parser('testar', help='Testes estatísticos')
+    _add_data_options(testar_parser)
+
+    # Importação/consulta e análise com resultados oficiais
+    resultados_parser = subparsers.add_parser('resultados', help='Consultar últimos resultados CAIXA')
+    resultados_parser.add_argument('--loteria', choices=[item.value for item in LoteriaTipo], default='lotofacil')
+    resultados_parser.add_argument('--ultimos', type=int, default=5)
+    resultados_parser.add_argument('--atualizar', action='store_true')
+
+    analise_parser = subparsers.add_parser('analisar', help='Executar análise completa sobre histórico escolhido')
+    _add_data_options(analise_parser)
 
     args = parser.parse_args()
 
@@ -204,6 +261,8 @@ Exemplos:
         'gerar': cmd_gerar,
         'simular': cmd_simular,
         'testar': cmd_testar,
+        'resultados': cmd_resultados,
+        'analisar': cmd_analisar,
     }
 
     if args.comando in comandos:

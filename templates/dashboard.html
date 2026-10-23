@@ -47,7 +47,7 @@
   <aside class="left-sidebar">
     <div class="sidebar-section-title">Loterias Disponíveis</div>
 
-    <div class="lottery-item active" onclick="selectLottery(this,'Mega-Sena')">
+    <div class="lottery-item active" data-loteria="mega_sena" onclick="selectLottery(this,'mega_sena')">
       <div class="lottery-item-left">
         <div class="lottery-icon">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
@@ -57,7 +57,7 @@
       <div class="toggle-dot"></div>
     </div>
 
-    <div class="lottery-item" onclick="selectLottery(this,'Quina')">
+    <div class="lottery-item disabled" aria-disabled="true" title="Modalidade ainda não suportada pela integração">
       <div class="lottery-item-left">
         <div class="lottery-icon">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
@@ -67,7 +67,7 @@
       <div class="toggle-dot"></div>
     </div>
 
-    <div class="lottery-item" onclick="selectLottery(this,'Lotofácil')">
+    <div class="lottery-item" data-loteria="lotofacil" onclick="selectLottery(this,'lotofacil')">
       <div class="lottery-item-left">
         <div class="lottery-icon">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
@@ -77,7 +77,7 @@
       <div class="toggle-dot"></div>
     </div>
 
-    <div class="lottery-item" onclick="selectLottery(this,'Lotomania')">
+    <div class="lottery-item" data-loteria="lotomania" onclick="selectLottery(this,'lotomania')">
       <div class="lottery-item-left">
         <div class="lottery-icon">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
@@ -87,7 +87,7 @@
       <div class="toggle-dot"></div>
     </div>
 
-    <div class="lottery-item" onclick="selectLottery(this,'Timemania')">
+    <div class="lottery-item disabled" aria-disabled="true" title="Modalidade ainda não suportada pela integração">
       <div class="lottery-item-left">
         <div class="lottery-icon">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
@@ -97,7 +97,7 @@
       <div class="toggle-dot"></div>
     </div>
 
-    <div class="lottery-item" onclick="selectLottery(this,'Dia de Sorte')">
+    <div class="lottery-item disabled" aria-disabled="true" title="Modalidade ainda não suportada pela integração">
       <div class="lottery-item-left">
         <div class="lottery-icon">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
@@ -107,7 +107,7 @@
       <div class="toggle-dot"></div>
     </div>
 
-    <div class="lottery-item" onclick="selectLottery(this,'+Milionária')">
+    <div class="lottery-item disabled" aria-disabled="true" title="Modalidade ainda não suportada pela integração">
       <div class="lottery-item-left">
         <div class="lottery-icon">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
@@ -167,6 +167,17 @@
         </div>
       </div>
 
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-header">
+          <div>
+            <div class="card-title" style="margin-bottom:4px">Resultados oficiais recentes — CAIXA</div>
+            <div id="resultados-status" style="font-size:11px;color:var(--text-dim)">Carregando resultados oficiais…</div>
+          </div>
+          <button class="btn btn-outline" style="font-size:11px" onclick="refreshDashboard(true)">Atualizar</button>
+        </div>
+        <div id="resultados-list" class="resultados-list"><div class="loading-state"><span class="spinner"></span><span>Consultando CAIXA…</span></div></div>
+      </div>
+
       <!-- Stats row -->
       <div class="stats-row" id="statsRow">
         <div class="stat-card green"><div class="stat-label">Concursos</div><div class="stat-value green" id="st-concursos">—</div></div>
@@ -224,7 +235,7 @@
           </div>
           <div class="ctrl-group">
             <label>Dezenas</label>
-            <input type="number" id="g-dezenas" value="15" min="15" max="20">
+            <input type="number" id="g-dezenas" value="6" min="6" max="15">
           </div>
           <div class="ctrl-group">
             <label>Jogos</label>
@@ -310,26 +321,27 @@
     <!-- Dicas da IA -->
     <div class="panel-title">Dicas da IA</div>
 
-    <div class="tip-card">
-      🤖 Dezenas com maior score composto tendem a aparecer em ciclos de 8–12 concursos.
-    </div>
-    <div class="tip-card">
-      📊 Frequência absoluta acima da média estatística indica dezena "quente" no período.
-    </div>
-    <div class="tip-card">
-      ⏱ Dezenas com atraso &gt; 3 sorteios têm probabilidade de retorno elevada.
-    </div>
+      <div class="tip-card">
+        📊 Frequência e atraso descrevem apenas o histórico observado; sorteios são independentes.
+      </div>
+      <div class="tip-card">
+        🎲 Rankings e scores são heurísticas descritivas, não previsões de dezenas futuras.
+      </div>
+      <div class="tip-card">
+        ℹ️ Nenhum método altera a probabilidade matemática de acerto. Jogue com responsabilidade.
+      </div>
 
     <!-- Predição rápida -->
-    <div class="panel-title" style="margin-top:16px">Predição Rápida</div>
+    <div class="panel-title" style="margin-top:16px">Geração Rápida</div>
 
     <select class="lottery-select" id="panel-lottery">
-      <option>Lotofácil</option>
-      <option>Mega-Sena</option>
-      <option>Quina</option>
+      <option value="mega_sena">Mega-Sena</option>
+      <option value="lotofacil">Lotofácil</option>
+      <option value="lotomania">Lotomania</option>
     </select>
 
     <div class="num-grid" id="numGrid"></div>
+    <div id="quick-result-status" style="font-size:11px;color:var(--text-dim);margin-top:8px"></div>
 
     <button class="btn-apostar" onclick="gerarRapido()">⚡ Gerar Jogo</button>
 
@@ -339,27 +351,41 @@
 
 <script src="/static/js/dashboard.js"></script>
 <script>
-  // Build number grid
-  const grid = document.getElementById('numGrid');
-  for (let i = 1; i <= 25; i++) {
-    const c = document.createElement('div');
-    c.className = 'num-cell';
-    c.textContent = String(i).padStart(2,'0');
-    c.onclick = () => c.classList.toggle('selected');
-    grid.appendChild(c);
+  function buildQuickGrid() {
+    const grid = document.getElementById('numGrid');
+    const total = window.LOTTERY_RULES[window.selectedLottery].total;
+    grid.replaceChildren();
+    for (let i = 1; i <= total; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'num-cell';
+      cell.dataset.dezena = i;
+      cell.textContent = String(i).padStart(2, '0');
+      grid.appendChild(cell);
+    }
   }
 
-  function gerarRapido() {
-    document.querySelectorAll('.num-cell').forEach(c => c.classList.remove('selected'));
-    const cells = Array.from(document.querySelectorAll('.num-cell'));
-    const picks = cells.sort(() => Math.random() - .5).slice(0, 15);
-    picks.forEach(c => c.classList.add('selected'));
+  async function gerarRapido() {
+    const status = document.getElementById('quick-result-status');
+    const regras = window.LOTTERY_RULES[window.selectedLottery];
+    status.textContent = 'Gerando jogo com histórico CAIXA…';
+    try {
+      const d = await apiFetch(`/api/gerar?loteria=${window.selectedLottery}&metodo=aleatorio&dezenas=${regras.min}&jogos=1`);
+      const escolhidas = new Set(d.jogos[0]);
+      document.querySelectorAll('.num-cell').forEach((cell) => {
+        cell.classList.toggle('selected', escolhidas.has(Number(cell.dataset.dezena)));
+      });
+      status.textContent = `Jogo gerado · último concurso disponível #${d.ultimo_concurso}.`;
+    } catch (error) {
+      status.textContent = `Erro: ${error.message}`;
+    }
   }
 
-  function selectLottery(el, name) {
-    document.querySelectorAll('.lottery-item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
-  }
+  document.getElementById('panel-lottery').addEventListener('change', (event) => {
+    const item = document.querySelector(`.lottery-item[data-loteria="${event.target.value}"]`);
+    if (item) selectLottery(item, event.target.value);
+  });
+
+  buildQuickGrid();
 </script>
 </body>
 </html>

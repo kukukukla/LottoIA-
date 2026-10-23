@@ -31,6 +31,7 @@ Plataforma profissional de análise quantitativa para loterias brasileiras (Loto
 - ✅ **Módulo de Machine Learning** — Implementação disponível em `motor_ml.py`
 - ✅ **Algoritmo Genético** — Evolução de jogos com fitness configurável
 - ✅ **Testes Estatísticos** — Qui-quadrado, Kolmogorov-Smirnov, Runs
+- ✅ **Dados oficiais CAIXA** — consulta, validação e cache dos resultados recentes de Lotofácil, Mega-Sena e Lotomania
 - ✅ **Análise Temporal** — Ciclos, momentum, sazonalidade, regressão
 - ✅ **Padrões Avançados** — Geométricos, numéricos, clusters
 - ✅ **Exportação** — Relatórios JSON, CSV, executivo
@@ -42,21 +43,24 @@ Plataforma profissional de análise quantitativa para loterias brasileiras (Loto
 ```
 LottoIA/
 ├── app.py                    # Aplicação web FastAPI e autenticação por sessão
-├── run.py                    # CLI: demo, geração, simulação e testes estatísticos
+├── caixa_client.py           # Cliente CAIXA: parsing validado, cache e fallback explícito
+├── run.py                    # CLI: demo, consulta/análise de resultados, geração e simulação
 ├── models.py                 # Entidades do domínio e tipos de loteria
 ├── main_engine.py            # Orquestrador dos motores
 ├── gerador_jogos.py          # Geração unificada de combinações
 ├── motor_*.py                # Motores estatístico, matemático, temporal, ML etc.
 ├── core/                     # Shims de compatibilidade e exports públicos
 ├── templates/ + static/      # HTML, CSS, JavaScript e imagens do dashboard
-├── test_motores.py            # Testes pytest (inclui regressões)
+├── test_motores.py            # Testes de motores e regressões
+├── tests/                     # Testes de cliente CAIXA e integração das rotas
 ├── requirements.txt           # Dependências Python
 ├── Dockerfile                 # Imagem que serve a aplicação web
 ├── docker-compose.yml         # Serviço web; requer secrets no ambiente
+├── FONTES_DADOS_CAIXA.md      # Fonte primária, validação e limitações observadas
 └── REVISAO_TECNICA.md         # Revisão, limitações, execução e desempenho
 ```
 
-Os módulos de implementação ficam na raiz; os módulos em `core/` reexportam os módulos legados. A aplicação e o CLI usam dados sintéticos na demonstração; não há carregamento automático de resultados oficiais.
+Os módulos de implementação ficam na raiz; `core/` reexporta os módulos do domínio por compatibilidade. A API usa a CAIXA por padrão nas três modalidades suportadas e informa o número do último concurso usado. A demonstração sintética é explícita (`fonte=demo` na API, `--fonte demo` na CLI ou `python run.py demo`). Os resultados oficiais são cacheados localmente em `data/loterias/`, diretório ignorado pelo Git; falha de rede sem cache resulta em erro, nunca em substituição silenciosa por dados de demonstração. Veja [fontes e limitações da integração](FONTES_DADOS_CAIXA.md).
 
 ---
 
@@ -89,6 +93,15 @@ python -m pip install -r requirements.txt
 # 4. Execute testes e demonstração
 python -m pytest -q
 python run.py demo
+
+# Consultar os cinco resultados oficiais mais recentes
+python run.py resultados --loteria lotofacil --ultimos 5
+
+# Gerar usando histórico oficial (a demo continua explícita e separada)
+python run.py gerar --fonte caixa --loteria mega_sena --metodo score --dezenas 6 --jogos 2
+
+# Executar análise completa de até 30 concursos CAIXA
+python run.py analisar --fonte caixa --loteria lotomania --ultimos 30
 ```
 
 ---

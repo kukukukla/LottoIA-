@@ -1099,3 +1099,61 @@ body::before {
   .main-content { margin-left: 0; }
   .nav-links { display: none; }
 }
+
+
+/* Resultados oficiais e modalidades ainda não integradas */
+.lottery-item.disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.num-grid {
+  max-height: 280px;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.resultados-list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.resultado-item {
+  padding: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.resultado-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+
+.resultado-cabecalho strong { color: var(--neon); }
+.resultado-cabecalho span { color: var(--text-dim); }
+
+.resultado-dezenas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.resultado-bola {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--neon-dim);
+  border-radius: 50%;
+  background: rgba(57,255,20,.09);
+  color: var(--white);
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+}

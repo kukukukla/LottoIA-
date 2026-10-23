@@ -4,11 +4,11 @@ Motor Estatístico de Loterias v2.0 — Web Application
 FastAPI + Jinja2 + Session Auth
 """
 
+import asyncio
 import os
 import logging as _logging
 import secrets as _secrets
 import random
-import numpy as np
 from datetime import date, timedelta, datetime
 from typing import Optional
 from collections import defaultdict
@@ -21,6 +21,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from core.models import Concurso, LoteriaTipo
 from core.main_engine import MotorPrincipal
+from caixa_client import CAIXA_CLIENT, CaixaAPIError
 
 # ──────────────────────────────────────────────
 # App setup
@@ -99,6 +100,40 @@ def gerar_dados_teste(loteria: LoteriaTipo, n: int = 300) -> list:
         ))
     return concursos
 
+
+async def carregar_concursos_api(
+    loteria_slug: str = "lotofacil",
+    fonte: str = "caixa",
+    quantidade: int = 30,
+    atualizar: bool = False,
+):
+    """Obtém histórico oficial em threadpool ou dados sintéticos explicitamente."""
+    try:
+        loteria = LoteriaTipo(loteria_slug)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Modalidade inválida.") from exc
+    if fonte == "demo":
+        concursos = gerar_dados_teste(loteria, max(300, quantidade))
+        return loteria, concursos, {
+            "fonte": "sintético/demo",
+            "atualizado_em": None,
+            "cache": False,
+            "cache_desatualizado": False,
+            "aviso": "Dados artificiais de demonstração; não são resultados oficiais.",
+        }
+    if fonte != "caixa":
+        raise HTTPException(status_code=422, detail="fonte deve ser 'caixa' ou 'demo'.")
+    try:
+        concursos, metadata = await asyncio.to_thread(
+            CAIXA_CLIENT.obter_historico, loteria, quantidade, atualizar
+        )
+    except CaixaAPIError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Resultados oficiais da CAIXA indisponíveis: {exc}",
+        ) from exc
+    return loteria, concursos, metadata
+
 # ──────────────────────────────────────────────
 # Auth routes
 # ──────────────────────────────────────────────
@@ -161,16 +196,50 @@ async def dashboard(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {"user": user})
 
 # ──────────────────────────────────────────────
+# API — Resultados oficiais recentes
+# ──────────────────────────────────────────────
+@app.get("/api/resultados")
+async def api_resultados(
+    request: Request,
+    loteria: str = Query(default="lotofacil"),
+    fonte: str = Query(default="caixa"),
+    quantidade: int = Query(default=5, ge=1, le=100),
+    atualizar: bool = Query(default=False),
+):
+    if not get_current_user(request):
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    modalidade, concursos, metadata = await carregar_concursos_api(
+        loteria, fonte, quantidade, atualizar
+    )
+    return {
+        "loteria": modalidade.value,
+        "total_concursos": len(concursos),
+        "ultimo_concurso": concursos[-1].numero if concursos else None,
+        "fonte_dados": metadata,
+        "resultados": [
+            {
+                "concurso": item.numero,
+                "data": item.data.isoformat(),
+                "dezenas": item.dezenas,
+            }
+            for item in concursos[-quantidade:]
+        ],
+    }
+
+# ──────────────────────────────────────────────
 # API — Análise Rápida
 # ──────────────────────────────────────────────
 @app.get("/api/analise")
-async def api_analise(request: Request):
+async def api_analise(
+    request: Request,
+    loteria: str = Query(default="lotofacil"),
+    fonte: str = Query(default="caixa"),
+    quantidade: int = Query(default=30, ge=1, le=300),
+):
     if not get_current_user(request):
         return JSONResponse({"error": "Não autenticado"}, status_code=401)
 
-    random.seed(None)
-    np.random.seed(None)
-    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    modalidade, concursos, metadata = await carregar_concursos_api(loteria, fonte, quantidade)
     motor = MotorPrincipal(concursos)
 
     freq = motor.estatistico.frequencia_absoluta()
@@ -198,6 +267,9 @@ async def api_analise(request: Request):
             for s in top10_score
         ],
         "total_concursos": len(concursos),
+        "loteria": modalidade.value,
+        "ultimo_concurso": concursos[-1].numero if concursos else None,
+        "fonte_dados": metadata,
     }
 
 # ──────────────────────────────────────────────
@@ -207,8 +279,11 @@ async def api_analise(request: Request):
 async def api_gerar(
     request: Request,
     metodo: str = "aleatorio",
-    dezenas: int = Query(default=15, ge=15, le=20),
+    dezenas: Optional[int] = Query(default=None, ge=1, le=100),
     jogos: int = Query(default=5, ge=1, le=50),
+    loteria: str = Query(default="lotofacil"),
+    fonte: str = Query(default="caixa"),
+    quantidade: int = Query(default=30, ge=1, le=300),
 ):
     if not get_current_user(request):
         return JSONResponse({"error": "Não autenticado"}, status_code=401)
@@ -217,27 +292,45 @@ async def api_gerar(
     if metodo not in metodos_validos:
         return JSONResponse({"error": f"Método inválido. Use: {metodos_validos}"}, status_code=400)
 
-    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    modalidade, concursos, metadata = await carregar_concursos_api(loteria, fonte, quantidade)
+    n_dezenas = modalidade.minimo_aposta if dezenas is None else dezenas
+    if not modalidade.minimo_aposta <= n_dezenas <= modalidade.maximo_aposta:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Para {modalidade.value}, dezenas deve ficar entre "
+                f"{modalidade.minimo_aposta} e {modalidade.maximo_aposta}."
+            ),
+        )
     motor = MotorPrincipal(concursos)
-    resultado = motor.gerar_jogos(metodo, n_dezenas=dezenas, n_jogos=jogos)
+    resultado = motor.gerar_jogos(metodo, n_dezenas=n_dezenas, n_jogos=jogos)
 
     return {
         "metodo": metodo,
-        "dezenas": dezenas,
+        "dezenas": n_dezenas,
         "jogos": [j["dezenas"] for j in resultado],
+        "loteria": modalidade.value,
+        "ultimo_concurso": concursos[-1].numero if concursos else None,
+        "fonte_dados": metadata,
     }
 
 # ──────────────────────────────────────────────
 # API — Monte Carlo
 # ──────────────────────────────────────────────
 @app.get("/api/simular")
-async def api_simular(request: Request, n: int = Query(default=1000, ge=1, le=10000)):
+async def api_simular(
+    request: Request,
+    n: int = Query(default=1000, ge=1, le=10000),
+    loteria: str = Query(default="lotofacil"),
+    fonte: str = Query(default="caixa"),
+    quantidade: int = Query(default=30, ge=1, le=300),
+):
     if not get_current_user(request):
         return JSONResponse({"error": "Não autenticado"}, status_code=401)
 
-    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    modalidade, concursos, metadata = await carregar_concursos_api(loteria, fonte, quantidade)
     motor = MotorPrincipal(concursos)
-    rel = motor.simulacoes.monte_carlo_aleatorio(n, 15)
+    rel = motor.simulacoes.monte_carlo_aleatorio(n, modalidade.dezenas_sorteadas)
 
     return {
         "total":   rel.total_simulacoes,
@@ -246,17 +339,25 @@ async def api_simular(request: Request, n: int = Query(default=1000, ge=1, le=10
         "minimo":  rel.min_acertos,
         "desvio":  rel.desvio_padrao,
         "distribuicao": {str(k): v for k, v in sorted(rel.acertos_percentual.items())},
+        "loteria": modalidade.value,
+        "ultimo_concurso": concursos[-1].numero if concursos else None,
+        "fonte_dados": metadata,
     }
 
 # ──────────────────────────────────────────────
 # API — Testes Estatísticos
 # ──────────────────────────────────────────────
 @app.get("/api/testes")
-async def api_testes(request: Request):
+async def api_testes(
+    request: Request,
+    loteria: str = Query(default="lotofacil"),
+    fonte: str = Query(default="caixa"),
+    quantidade: int = Query(default=30, ge=1, le=300),
+):
     if not get_current_user(request):
         return JSONResponse({"error": "Não autenticado"}, status_code=401)
 
-    concursos = gerar_dados_teste(LoteriaTipo.LOTOFACIL, 300)
+    modalidade, concursos, metadata = await carregar_concursos_api(loteria, fonte, quantidade)
     motor = MotorPrincipal(concursos)
 
     chi  = motor.comparativo.teste_chi_quadrado(concursos)
@@ -278,6 +379,10 @@ async def api_testes(request: Request):
             "z_score":      runs.get("z_score"),
             "interpretacao": runs.get("interpretacao", ""),
         },
+        "loteria": modalidade.value,
+        "ultimo_concurso": concursos[-1].numero if concursos else None,
+        "total_concursos": len(concursos),
+        "fonte_dados": metadata,
     }
 
 # ──────────────────────────────────────────────

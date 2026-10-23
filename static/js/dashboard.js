@@ -1,14 +1,21 @@
 /* Motor Estatístico de Loterias v2.0 — Dashboard JS */
 
+window.LOTTERY_RULES = {
+  mega_sena: {label: 'Mega-Sena', total: 60, drawn: 6, min: 6, max: 15},
+  lotofacil: {label: 'Lotofácil', total: 25, drawn: 15, min: 15, max: 20},
+  lotomania: {label: 'Lotomania', total: 100, drawn: 20, min: 50, max: 50}
+};
+window.selectedLottery = 'mega_sena';
+
 /* ────────────────────────────────────────────
    Navigation
 ──────────────────────────────────────────── */
 function showSection(id, btn) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
   document.getElementById('sec-' + id).classList.add('active');
   btn.classList.add('active');
-  if (id === 'analise' && !window._analiseLoaded) loadAnalise();
+  if (id === 'analise' && !window._analiseLoaded) refreshDashboard();
 }
 
 /* ────────────────────────────────────────────
@@ -16,12 +23,35 @@ function showSection(id, btn) {
 ──────────────────────────────────────────── */
 async function apiFetch(url) {
   const r = await fetch(url);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) {
+    let message = `HTTP ${r.status}`;
+    try {
+      const body = await r.json();
+      message = body.detail || body.error || message;
+    } catch (_) { /* resposta sem JSON */ }
+    throw new Error(message);
+  }
   return r.json();
 }
 
 function spinner() {
   return `<div class="loading-state"><span class="spinner"></span> Calculando…</div>`;
+}
+
+function selectLottery(element, slug) {
+  if (!window.LOTTERY_RULES[slug]) return;
+  window.selectedLottery = slug;
+  document.querySelectorAll('.lottery-item[data-loteria]').forEach(item => item.classList.remove('active'));
+  element.classList.add('active');
+  document.getElementById('panel-lottery').value = slug;
+  const rules = window.LOTTERY_RULES[slug];
+  const input = document.getElementById('g-dezenas');
+  input.min = rules.min;
+  input.max = rules.max;
+  input.value = rules.min;
+  if (typeof buildQuickGrid === 'function') buildQuickGrid();
+  window._analiseLoaded = false;
+  refreshDashboard();
 }
 
 /* ────────────────────────────────────────────
@@ -34,7 +64,7 @@ async function loadAnalise() {
   });
 
   try {
-    const d = await apiFetch('/api/analise');
+    const d = await apiFetch(`/api/analise?loteria=${window.selectedLottery}&quantidade=30`);
 
     // Stats
     document.getElementById('st-concursos').textContent = d.total_concursos;
@@ -123,8 +153,8 @@ async function gerarJogos() {
   out.innerHTML = spinner();
 
   try {
-    const d = await apiFetch(`/api/gerar?metodo=${metodo}&dezenas=${dezenas}&jogos=${jogos}`);
-    label.textContent = `Método: ${d.metodo} · ${d.dezenas} dezenas`;
+    const d = await apiFetch(`/api/gerar?metodo=${metodo}&dezenas=${dezenas}&jogos=${jogos}&loteria=${window.selectedLottery}&quantidade=30`);
+    label.textContent = `Método: ${d.metodo} · ${d.dezenas} dezenas · concurso #${d.ultimo_concurso}`;
 
     const cores = ['#3fb950','#e3b341','#58a6ff','#f85149','#bc8cff','#ff7b72'];
 
@@ -159,7 +189,7 @@ async function simular() {
   dis.innerHTML = spinner();
 
   try {
-    const d = await apiFetch(`/api/simular?n=${n}`);
+    const d = await apiFetch(`/api/simular?n=${n}&loteria=${window.selectedLottery}&quantidade=30`);
 
     res.innerHTML = `
       <table class="data-table">
@@ -205,7 +235,7 @@ async function rodarTestes() {
   out.innerHTML = spinner();
 
   try {
-    const d = await apiFetch('/api/testes');
+    const d = await apiFetch(`/api/testes?loteria=${window.selectedLottery}&quantidade=30`);
     const chi  = d.chi_quadrado;
     const ks   = d.kolmogorov_smirnov;
     const runs = d.runs;
@@ -245,5 +275,35 @@ async function rodarTestes() {
   }
 }
 
-/* ── Auto-load análise na abertura ── */
-window.addEventListener('DOMContentLoaded', loadAnalise);
+/* ── Resultados oficiais e carga inicial ── */
+async function loadResultados(forceUpdate = false) {
+  const status = document.getElementById('resultados-status');
+  const output = document.getElementById('resultados-list');
+  if (!status || !output) return;
+  output.innerHTML = spinner();
+  try {
+    const atualizar = forceUpdate ? '&atualizar=true' : '';
+    const d = await apiFetch(`/api/resultados?loteria=${window.selectedLottery}&quantidade=5${atualizar}`);
+    const meta = d.fonte_dados || {};
+    const cacheInfo = meta.cache_desatualizado
+      ? 'cache desatualizado (CAIXA indisponível)'
+      : (meta.cache ? 'cache local' : 'consulta CAIXA');
+    status.textContent = `${window.LOTTERY_RULES[window.selectedLottery].label} · último concurso #${d.ultimo_concurso} · ${cacheInfo}`;
+    if (meta.aviso) status.textContent += ` · ${meta.aviso}`;
+    output.innerHTML = d.resultados.map(item => {
+      const data = new Date(`${item.data}T00:00:00Z`).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+      const bolas = item.dezenas.map(n => `<span class="resultado-bola">${String(n).padStart(2, '0')}</span>`).join('');
+      return `<div class="resultado-item"><div class="resultado-cabecalho"><strong>Concurso #${item.concurso}</strong><span>${data}</span></div><div class="resultado-dezenas">${bolas}</div></div>`;
+    }).join('');
+  } catch (error) {
+    status.textContent = 'Não foi possível atualizar os resultados oficiais.';
+    output.textContent = error.message;
+  }
+}
+
+async function refreshDashboard(forceUpdate = false) {
+  await loadAnalise();
+  await loadResultados(forceUpdate);
+}
+
+window.addEventListener('DOMContentLoaded', refreshDashboard);

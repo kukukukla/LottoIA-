@@ -4,7 +4,7 @@
 
 A revisão foi feita sobre a branch `main` do repositório `kukukukla/LottoIA-`. As correções incluídas nesta atualização abrangem importação e API pública do pacote `core`, simulação Monte Carlo, autenticação/sessões, limites de requisição, dependências web e configuração do container. Foi também evitado um cálculo repetido da matriz de correlação no cálculo de scores.
 
-A aplicação pode ser executada como CLI ou como serviço FastAPI. A demonstração e a aplicação web usam **concursos sintéticos aleatórios**, não uma integração com resultados oficiais da Caixa. Portanto, os rankings e jogos gerados são demonstrações estatísticas, não previsões, e não aumentam a probabilidade matemática de acerto.
+A aplicação pode ser executada como CLI ou como serviço FastAPI. A CLI oferece uma demonstração sintética explícita e também consulta resultados oficiais da CAIXA para Lotofácil, Mega-Sena e Lotomania. A API e o dashboard usam a CAIXA por padrão, identificam o último concurso e mostram os resultados recentes. Dados sintéticos só são usados quando `fonte=demo`/`--fonte demo` é solicitado ou em `run.py demo`. Rankings e jogos continuam sendo critérios descritivos/heurísticos: não preveem sorteios nem aumentam a probabilidade matemática de acerto.
 
 ## Revisões e correções aplicadas
 
@@ -16,6 +16,9 @@ A aplicação pode ser executada como CLI ou como serviço FastAPI. A demonstra�
 6. **Dependência do formulário:** incluído `python-multipart`, necessário para que o FastAPI registre e processe o formulário de login.
 7. **Container:** Docker e Compose iniciam o servidor web em `0.0.0.0:5000`, não apenas a demonstração CLI. O Compose exige `SESSION_SECRET`, `ADMIN_USERNAME` e `ADMIN_PASSWORD` no ambiente.
 8. **Testes:** adicionados testes de regressão para quantidade exata de simulações, rejeição de entrada inválida e cálculo único da matriz de correlação.
+9. **Resultados CAIXA:** criado `caixa_client.py` para mapear modalidades internas aos slugs da CAIXA, validar número/data/dezenas e consultar o concurso mais recente. Como o índice da fonte pode ficar defasado, o cliente verifica concursos subsequentes; resultados de até 300 concursos são buscados com paralelismo limitado.
+10. **Cache e indisponibilidade:** cache JSON local, escrita atômica e TTL de 10 minutos; em falha de rede, o uso do cache é explicitamente identificado como recente ou desatualizado. Sem cache válido, a API retorna HTTP 503. Credenciais e dados de cache não são adicionados ao Git.
+11. **API/CLI/UI:** rotas de resultados, análise, geração, simulação e testes aceitam modalidade e fonte; CLI tem `resultados` e `analisar`. O dashboard exibe concursos oficiais, permite atualização forçada e seleciona as três modalidades suportadas, com limites de dezenas adequados. Modalidades não suportadas aparecem desabilitadas.
 
 ## Estrutura e responsabilidades
 
@@ -38,18 +41,20 @@ O código de domínio está principalmente na raiz; os módulos em `core/` reexp
 | `motor_genetico.py` | Evolução de combinações por fitness; inicializado sob demanda pelo orquestrador. |
 | `motor_ml.py` | Modelos de ML disponíveis no módulo; não é uma opção da lista de métodos da CLI/web nesta configuração. |
 | `motor_relatorios.py` | Relatórios executivos, JSON e dados para CSV/simulações. |
+| `caixa_client.py` | Cliente CAIXA, validação do payload oficial e cache local com fallback identificado. |
 | `app.py`, `templates/`, `static/` | Aplicação FastAPI, sessão de login, páginas e assets do dashboard. |
-| `run.py` | CLI de demonstração, geração, simulação e testes estatísticos. |
-| `test_motores.py` | Suíte de testes automatizados de domínio e regressão. |
+| `run.py` | CLI de demonstração, consulta oficial, análise, geração, simulação e testes. |
+| `test_motores.py`, `tests/` | Testes de domínio, cliente CAIXA, API, integração, cache e regressões. |
 | `requirements.txt`, `Dockerfile`, `docker-compose.yml` | Dependências Python, imagem e execução web containerizada. |
 
 ## Fluxo da lógica
 
-1. Os concursos são representados como objetos `Concurso`, associados a uma `LoteriaTipo`.
-2. `MotorPrincipal` ordena o histórico e compõe os motores de estatística, score, estratégia, tempo, padrões, testes, simulação, relatório e geração.
-3. Os motores calculam métricas descritivas a partir do histórico. O score pondera frequência absoluta/recente, atraso, tendência, ciclos e correlação; o gerador seleciona combinações conforme o método escolhido.
-4. A simulação cria um jogo aleatório e o compara com uma amostra de concursos históricos. Backtests separam janelas de treino/teste em ordem temporal.
-5. A API web verifica sessão antes de expor análises, geração e simulação; o login usa credenciais de ambiente e proteção de tentativas por endereço IP em memória.
+1. O cliente consulta o endpoint HTTPS da CAIXA, valida e ordena as dezenas, valida número/data/modalidade e converte cada concurso em objeto `Concurso`. A integração e suas limitações estão em [FONTES_DADOS_CAIXA.md](FONTES_DADOS_CAIXA.md).
+2. Um cache local reduz chamadas. O cache é gravado atomicamente; falhas não são convertidas em dados sintéticos. A resposta informa idade/origem do cache; sem cache, o serviço falha de forma explícita.
+3. `MotorPrincipal` ordena o histórico e compõe os motores de estatística, score, estratégia, tempo, padrões, testes, simulação, relatório e geração.
+4. Os motores calculam métricas descritivas a partir do histórico. O score pondera frequência absoluta/recente, atraso, tendência, ciclos e correlação; o gerador seleciona combinações conforme o método escolhido.
+5. A simulação cria jogos aleatórios e os compara com concursos históricos. Backtests separam janelas de treino/teste em ordem temporal.
+6. A API web verifica sessão antes de expor resultados e análises; o login usa credenciais de ambiente e proteção de tentativas por endereço IP em memória.
 
 A aleatoriedade dos sorteios significa que frequência histórica, atraso, score e modelos não devem ser tratados como vantagem preditiva. Os testes estatísticos descrevem uma amostra e não demonstram previsibilidade.
 
@@ -105,9 +110,11 @@ O serviço web fica na porta 5000. Se o tráfego for servido por HTTPS atrás de
 Validação executada no sandbox, Python 3.12.3:
 
 - `python -m compileall -q .`: passou.
-- `python -m pytest -q`: **16 testes passaram** após adicionar a regressão de correlação.
-- Teste HTTP com `TestClient`: login, dashboard, autorização, limites, geração e simulação passaram.
+- `python -m pytest -q`: **45 testes passaram** na rodada final, incluindo parsing e rejeição de payloads CAIXA inválidos, descoberta do concurso mais recente, cache/fallback offline e integração autenticada das rotas/modalidades.
+- `python -m compileall -q .`, `node --check static/js/dashboard.js` e `git diff --check`: passaram.
+- Teste HTTP com `TestClient`: login, dashboard, autorização, limites, resultados, análise, geração, simulação e testes estatísticos passaram usando cliente CAIXA controlado por mocks (sem tráfego externo na suíte).
 - `python run.py demo`: conclusão normal.
+- Consultas oficiais ao vivo confirmaram Lotofácil #3811, Mega-Sena #3073 e Lotomania #2990 em 23/10/2026; geração `score` da Lotofácil executada com histórico real de 5 concursos.
 - Docker não estava instalado no ambiente, portanto não foi possível executar `docker build` ou validar o container em runtime.
 
 Tempos de parede observados em execuções locais pontuais (incluem inicialização do interpretador; não são SLA nem benchmark de produção):
@@ -124,7 +131,8 @@ Os valores variam por CPU, versões NumPy/SciPy e carga do host. O custo do Mont
 
 ## Limitações e próximos passos técnicos
 
-- A API e o CLI geram dados sintéticos para demonstração; não há, nesta versão, carregador que atualize automaticamente resultados oficiais. O CSV de exemplo não é usado automaticamente.
+- O endpoint público da CAIXA não fornece contrato de API versionado. A busca de concurso próximo infere a ausência de concurso futuro em respostas HTTP 404/500, comportamento que pode mudar; consulte `FONTES_DADOS_CAIXA.md`. O botão Atualizar força nova consulta, mas não substitui monitoramento de disponibilidade do provedor.
+- Para buscar até 300 resultados históricos, o serviço faz várias chamadas por concurso (paralelismo limitado a 4 por padrão); a latência e os limites de requisição dependem da CAIXA. O cache local é por instalação/contêiner e não é compartilhado entre réplicas.
 - A proteção contra força bruta é um contador em memória: reinicia com o processo e não coordena múltiplas réplicas. Para implantação distribuída, mova o rate limit para um armazenamento compartilhado e configure proxy/IP confiável.
-- Os testes atuais validam motores principais e regressões específicas; não substituem testes de integração de produção, testes de carga, revisão de segurança independente ou validação de dados reais.
+- Os testes de cliente e API são offline e usam respostas simuladas. Foi feita consulta real à CAIXA durante o desenvolvimento, mas os testes não garantem disponibilidade futura nem substituem monitoramento, testes de carga ou revisão independente de segurança.
 - O score e os métodos de geração são heurísticas e critérios descritivos; não oferecem previsão de sorteios.
