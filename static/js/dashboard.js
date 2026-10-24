@@ -16,13 +16,19 @@ function showSection(id, btn) {
   document.getElementById('sec-' + id).classList.add('active');
   btn.classList.add('active');
   if (id === 'analise' && !window._analiseLoaded) refreshDashboard();
+  if (id === 'gerar') loadHistoricoJogos();
 }
 
 /* ────────────────────────────────────────────
    Utils
 ──────────────────────────────────────────── */
-async function apiFetch(url) {
-  const r = await fetch(url);
+async function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (options.method && options.method.toUpperCase() !== 'GET') {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    headers.set('X-CSRF-Token', csrf);
+  }
+  const r = await fetch(url, {...options, headers});
   if (!r.ok) {
     let message = `HTTP ${r.status}`;
     try {
@@ -36,6 +42,12 @@ async function apiFetch(url) {
 
 function spinner() {
   return `<div class="loading-state"><span class="spinner"></span> Calculando…</div>`;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
 }
 
 function selectLottery(element, slug) {
@@ -141,6 +153,7 @@ async function loadAnalise() {
    Gerar Jogos
 ──────────────────────────────────────────── */
 async function gerarJogos() {
+  const nome = document.getElementById('g-nome').value.trim();
   const metodo  = document.getElementById('g-metodo').value;
   const dezenas = document.getElementById('g-dezenas').value;
   const jogos   = document.getElementById('g-jogos').value;
@@ -151,26 +164,103 @@ async function gerarJogos() {
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span> Gerando…`;
   out.innerHTML = spinner();
+  document.getElementById('comparacao-output').replaceChildren();
 
   try {
-    const d = await apiFetch(`/api/gerar?metodo=${metodo}&dezenas=${dezenas}&jogos=${jogos}&loteria=${window.selectedLottery}&quantidade=30`);
-    label.textContent = `Método: ${d.metodo} · ${d.dezenas} dezenas · concurso #${d.ultimo_concurso}`;
+    if (!nome) throw new Error('Informe um nome para este lote de jogos.');
+    const d = await apiFetch('/api/jogos', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        nome,
+        metodo,
+        dezenas: Number(dezenas),
+        jogos: Number(jogos),
+        loteria: window.selectedLottery,
+        fonte: 'caixa',
+        historico: 30
+      })
+    });
+    label.textContent = `Método: ${d.method} · ${d.number_count} dezenas · concurso CAIXA #${d.reference_draw}`;
 
     const cores = ['#3fb950','#e3b341','#58a6ff','#f85149','#bc8cff','#ff7b72'];
 
-    out.innerHTML = `<div class="jogos-grid">${d.jogos.map((bolas, i) => `
+    out.innerHTML = `<div class="batch-heading"><strong>${escapeHtml(d.name)}</strong><span>${d.game_count} jogo(s) salvo(s) no histórico</span></div>
+    <div class="jogos-grid">${d.games.map((bolas, i) => `
       <div class="jogo-card">
         <div class="jogo-num">Jogo ${i + 1}</div>
         <div class="bolas">${bolas.map(b => `
           <div class="bola" style="background:${cores[i % cores.length]}">${b}</div>
         `).join('')}</div>
       </div>`).join('')}
+    </div>
+    <div class="batch-actions">
+      <a class="btn btn-outline" href="/api/jogos/${encodeURIComponent(d.id)}/texto" download>Baixar TXT</a>
+      <button class="btn btn-outline" onclick="compararJogos('${d.id}')">Comparar com resultados</button>
+      <button class="btn btn-outline" onclick="compararJogos('${d.id}', true)">Atualizar CAIXA e comparar</button>
     </div>`;
+    await loadHistoricoJogos();
   } catch (e) {
     out.innerHTML = `<div style="color:var(--red);padding:16px">Erro: ${e.message}</div>`;
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🎲 Gerar';
+  }
+}
+
+async function loadHistoricoJogos() {
+  const out = document.getElementById('historico-jogos');
+  if (!out) return;
+  out.innerHTML = spinner();
+  try {
+    const d = await apiFetch('/api/jogos?limite=50');
+    if (!d.lotes.length) {
+      out.textContent = 'Ainda não há jogos salvos nesta conta.';
+      return;
+    }
+    out.innerHTML = `<div class="history-list">${d.lotes.map((batch) => `
+      <article class="history-item">
+        <div class="history-info">
+          <strong>${escapeHtml(batch.name)}</strong>
+          <span>${escapeHtml(batch.lottery)} · ${escapeHtml(batch.method)} · ${batch.game_count} jogo(s) · concurso-base #${batch.reference_draw ?? '—'}</span>
+          <time>${escapeHtml(new Date(batch.created_at).toLocaleString('pt-BR'))}</time>
+        </div>
+        <div class="batch-actions">
+          <a class="btn btn-outline" href="/api/jogos/${encodeURIComponent(batch.id)}/texto" download>TXT</a>
+          <button class="btn btn-outline" onclick="compararJogos('${batch.id}')">Comparar</button>
+          <button class="btn btn-outline" onclick="compararJogos('${batch.id}', true)">Atualizar CAIXA</button>
+        </div>
+      </article>`).join('')}</div>`;
+  } catch (error) {
+    out.textContent = `Não foi possível carregar o histórico: ${error.message}`;
+  }
+}
+
+async function compararJogos(batchId, atualizar = false) {
+  const out = document.getElementById('comparacao-output');
+  out.innerHTML = spinner();
+  try {
+    const entrada = Number(document.getElementById('g-comparar')?.value || 30);
+    const quantidade = Number.isInteger(entrada) ? Math.max(1, Math.min(100, entrada)) : 30;
+    const d = await apiFetch(`/api/jogos/${encodeURIComponent(batchId)}/comparar?quantidade=${quantidade}&atualizar=${atualizar}`);
+    const summary = d.resumo_por_jogo.map(item =>
+      `<span class="comparison-chip">Jogo ${item.jogo}: máximo ${item.maximo_acertos} acertos${item.concurso_maximo ? ` (concurso #${item.concurso_maximo})` : ''}</span>`
+    ).join('');
+    const rows = d.resultados_comparados.map(result => `
+      <tr class="${result.atual ? 'current-draw' : ''}">
+        <td>${result.atual ? 'Mais recente · ' : ''}#${result.concurso}<br><small>${escapeHtml(result.data)}</small></td>
+        <td>${result.dezenas_sorteadas.map(n => String(n).padStart(2, '0')).join(' ')}</td>
+        <td>${result.jogos.map(game => `J${game.jogo}: <strong>${game.acertos}</strong>${game.dezenas_correspondentes.length ? ` [${game.dezenas_correspondentes.map(n => String(n).padStart(2, '0')).join(', ')}]` : ''}`).join('<br>')}</td>
+      </tr>`).join('');
+    out.innerHTML = `<div class="comparison-card">
+      <div class="batch-heading"><strong>Espelho: ${escapeHtml(d.nome)}</strong><span>Último resultado oficial: #${d.concurso_mais_recente}</span></div>
+      <div class="comparison-summary">${summary}</div>
+      <div class="comparison-table-wrap"><table class="data-table"><thead><tr><th>Concurso</th><th>Dezenas sorteadas</th><th>Acertos por jogo</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="disclaimer">${escapeHtml(d.aviso)} Fonte: ${escapeHtml(d.fonte_dados.fonte)}${d.fonte_dados.cache ? (d.fonte_dados.cache_desatualizado ? ' · cache desatualizado' : ' · cache') : ' · consulta direta'}.</p>
+    </div>`;
+    out.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  } catch (error) {
+    out.textContent = `Falha na comparação com resultados oficiais: ${error.message}`;
   }
 }
 
@@ -306,4 +396,7 @@ async function refreshDashboard(forceUpdate = false) {
   await loadResultados(forceUpdate);
 }
 
-window.addEventListener('DOMContentLoaded', refreshDashboard);
+window.addEventListener('DOMContentLoaded', () => {
+  refreshDashboard();
+  loadHistoricoJogos();
+});

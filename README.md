@@ -17,6 +17,7 @@ Plataforma profissional de análise quantitativa para loterias brasileiras (Loto
 - [Estratégias Configuráveis](#-estratégias-configuráveis)
 - [Testes Estatísticos](#-testes-estatísticos)
 - [Deploy](#-deploy)
+- [Operação local e jogos salvos](OPERACAO_DOCKER_E_JOGOS.md)
 - [Revisão técnica](REVISAO_TECNICA.md)
 - [Licença](#-licença)
 
@@ -32,6 +33,8 @@ Plataforma profissional de análise quantitativa para loterias brasileiras (Loto
 - ✅ **Algoritmo Genético** — Evolução de jogos com fitness configurável
 - ✅ **Testes Estatísticos** — Qui-quadrado, Kolmogorov-Smirnov, Runs
 - ✅ **Dados oficiais CAIXA** — consulta, validação e cache dos resultados recentes de Lotofácil, Mega-Sena e Lotomania
+- ✅ **Lotes persistentes** — nome, modalidade, método e quantidade de jogos; histórico SQLite e exportação `.txt`
+- ✅ **Espelho histórico** — comparação de coincidências de cada jogo com concursos anteriores e o mais recente disponível
 - ✅ **Análise Temporal** — Ciclos, momentum, sazonalidade, regressão
 - ✅ **Padrões Avançados** — Geométricos, numéricos, clusters
 - ✅ **Exportação** — Relatórios JSON, CSV, executivo
@@ -44,6 +47,7 @@ Plataforma profissional de análise quantitativa para loterias brasileiras (Loto
 LottoIA/
 ├── app.py                    # Aplicação web FastAPI e autenticação por sessão
 ├── caixa_client.py           # Cliente CAIXA: parsing validado, cache e fallback explícito
+├── games_store.py            # Histórico persistente de lotes no SQLite
 ├── run.py                    # CLI: demo, consulta/análise de resultados, geração e simulação
 ├── models.py                 # Entidades do domínio e tipos de loteria
 ├── main_engine.py            # Orquestrador dos motores
@@ -54,8 +58,12 @@ LottoIA/
 ├── test_motores.py            # Testes de motores e regressões
 ├── tests/                     # Testes de cliente CAIXA e integração das rotas
 ├── requirements.txt           # Dependências Python
+├── requirements-docker.txt    # Dependências mínimas de execução web no container
 ├── Dockerfile                 # Imagem que serve a aplicação web
 ├── docker-compose.yml         # Serviço web; requer secrets no ambiente
+├── .dockerignore               # Exclui .env, caches e bancos do build context
+├── .env.example               # Modelo de configuração local, sem segredos
+├── OPERACAO_DOCKER_E_JOGOS.md # Docker local, login, exportação, histórico e comparação
 ├── FONTES_DADOS_CAIXA.md      # Fonte primária, validação e limitações observadas
 └── REVISAO_TECNICA.md         # Revisão, limitações, execução e desempenho
 ```
@@ -245,21 +253,11 @@ Resultados esperados para sorteios verdadeiramente aleatórios:
 
 ---
 
-## 🐳 Deploy
+## 🐳 Docker local
 
-O container inicia a aplicação FastAPI na porta 5000. Configure as credenciais em um `.env` local (não versionado) antes de subir:
+Instale Docker Desktop no Windows/macOS ou Docker Engine com o plugin Compose no Linux. Depois copie `.env.example` para `.env`, preencha credenciais e gere `SESSION_SECRET` aleatório; então rode `docker compose up --build -d` e acesse `http://localhost:5000`. A porta fica vinculada ao próprio computador e o histórico/cache persistem no volume `lottoia_data`.
 
-```dotenv
-SESSION_SECRET=gere-um-segredo-aleatorio-longo
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=senha-forte
-```
-
-```bash
-docker compose up --build -d
-```
-
-O Compose atual contém somente o serviço web. As configurações de PostgreSQL e Redis no YAML estão comentadas; não há frontend React configurado neste repositório. Em produção atrás de TLS, configure `SESSION_HTTPS_ONLY=true` no ambiente do serviço.
+O manual [Docker, segurança e operação de jogos](OPERACAO_DOCKER_E_JOGOS.md) inclui links oficiais de instalação por sistema, setup local passo a passo, política de login, backup, comparação e limites para uso como aplicativo móvel. Para HTTPS em uma publicação remota, use um proxy TLS e configure `SESSION_HTTPS_ONLY=true`.
 
 ---
 

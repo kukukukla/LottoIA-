@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>LottoIA — Dashboard</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -22,7 +23,7 @@
 
   <div class="nav-links">
     <button class="nav-link active" onclick="showSection('analise',this)">Dashboard</button>
-    <button class="nav-link" onclick="showSection('gerar',this)">Predições IA</button>
+    <button class="nav-link" onclick="showSection('gerar',this)">Gerar jogos</button>
     <button class="nav-link" onclick="showSection('monte',this)">Monte Carlo</button>
     <button class="nav-link" onclick="showSection('testes',this)">Testes</button>
   </div>
@@ -131,7 +132,7 @@
         <div class="card-header">
           <div class="card-title" style="margin-bottom:0">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--neon)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            Análise IA Principal
+            Análise estatística principal
           </div>
           <button class="btn btn-outline" style="font-size:11px" onclick="loadAnalise()">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
@@ -198,7 +199,7 @@
         <div class="card">
           <div class="card-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--gold)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            Top 10 — Score IA
+            Top 10 — Score composto
           </div>
           <div id="tbl-score"><div class="loading-state"><span class="spinner"></span><span>Carregando…</span></div></div>
         </div>
@@ -219,14 +220,18 @@
       <div class="card">
         <div class="card-title">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--neon)"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
-          Gerar Jogos — Predições IA
+          Gerar jogos por método estatístico
         </div>
         <div class="controls" style="margin-bottom:20px">
+          <div class="ctrl-group">
+            <label>Nome do lote</label>
+            <input type="text" id="g-nome" value="Meus jogos" maxlength="80" autocomplete="off">
+          </div>
           <div class="ctrl-group">
             <label>Método</label>
             <select id="g-metodo">
               <option value="aleatorio">Aleatório</option>
-              <option value="score" selected>Score IA</option>
+              <option value="score" selected>Score composto</option>
               <option value="frequencia">Frequência</option>
               <option value="atraso">Atraso</option>
               <option value="balanceado">Balanceado</option>
@@ -239,7 +244,11 @@
           </div>
           <div class="ctrl-group">
             <label>Jogos</label>
-            <input type="number" id="g-jogos" value="6" min="1" max="20">
+            <input type="number" id="g-jogos" value="6" min="1" max="50">
+          </div>
+          <div class="ctrl-group">
+            <label>Concursos no espelho</label>
+            <input type="number" id="g-comparar" value="30" min="1" max="100">
           </div>
           <button class="btn btn-primary" onclick="gerarJogos()" id="btn-gerar">
             ⚡ Gerar
@@ -252,6 +261,15 @@
         <div id="jogos-output">
           <div class="loading-state" style="color:var(--text-dim)">Configure os parâmetros e clique em Gerar.</div>
         </div>
+        <div id="comparacao-output" class="comparison-output" aria-live="polite"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-header">
+          <div class="card-title" style="margin-bottom:0">Histórico de jogos salvos</div>
+          <button class="btn btn-outline" onclick="loadHistoricoJogos()">Atualizar histórico</button>
+        </div>
+        <div id="historico-jogos"><div class="loading-state">Carregando histórico…</div></div>
       </div>
     </section>
 

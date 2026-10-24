@@ -15,3 +15,5 @@ htmlcov/
 # Local CAIXA data cache (recreated by the importer)
 data/loterias/*.json
 data/loterias/*.tmp
+data/*.sqlite3
+data/*.sqlite3-*

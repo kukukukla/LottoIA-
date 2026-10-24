@@ -9,12 +9,14 @@ import os
 import logging as _logging
 import secrets as _secrets
 import random
+import sqlite3
 from datetime import date, timedelta, datetime
-from typing import Optional
+from typing import Literal, Optional
 from collections import defaultdict
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, PlainTextResponse
+from pydantic import BaseModel, Field
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -22,11 +24,22 @@ from starlette.middleware.sessions import SessionMiddleware
 from core.models import Concurso, LoteriaTipo
 from core.main_engine import MotorPrincipal
 from caixa_client import CAIXA_CLIENT, CaixaAPIError
+from games_store import GAME_STORE
 
 # ──────────────────────────────────────────────
 # App setup
 # ──────────────────────────────────────────────
 app = FastAPI(title="Motor Estatístico de Loterias v2.0")
+
+
+class GenerateBatchRequest(BaseModel):
+    nome: str = Field(min_length=1, max_length=80)
+    loteria: str = "lotofacil"
+    metodo: Literal["aleatorio", "score", "frequencia", "atraso", "balanceado", "fibonacci"] = "score"
+    dezenas: Optional[int] = Field(default=None, ge=1, le=100)
+    jogos: int = Field(default=5, ge=1, le=50)
+    fonte: Literal["caixa", "demo"] = "caixa"
+    historico: int = Field(default=30, ge=1, le=300)
 
 SECRET_KEY = os.environ.get("SESSION_SECRET") or _secrets.token_urlsafe(32)
 if not os.environ.get("SESSION_SECRET"):
@@ -159,7 +172,8 @@ async def login(request: Request, username: str = Form(...), password: str = For
         # Reset failed counter on success
         _FAILED[ip] = {"count": 0, "lockout_until": None}
         request.session.clear()
-        request.session["user"] = username
+        request.session["user"] = _ADMIN_USER
+        request.session["csrf_token"] = _secrets.token_urlsafe(32)
         return RedirectResponse("/dashboard", status_code=302)
 
     # Increment failure counter
@@ -193,7 +207,17 @@ async def dashboard(request: Request):
     user = get_current_user(request)
     if not user:
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse(request, "dashboard.html", {"user": user})
+    return templates.TemplateResponse(
+        request, "dashboard.html",
+        {"user": user, "csrf_token": request.session.get("csrf_token", "")},
+    )
+
+
+def validar_csrf(request: Request) -> None:
+    esperado = request.session.get("csrf_token")
+    recebido = request.headers.get("x-csrf-token", "")
+    if not esperado or not recebido or not _secrets.compare_digest(esperado, recebido):
+        raise HTTPException(status_code=403, detail="Token CSRF ausente ou inválido.")
 
 # ──────────────────────────────────────────────
 # API — Resultados oficiais recentes
@@ -312,6 +336,159 @@ async def api_gerar(
         "loteria": modalidade.value,
         "ultimo_concurso": concursos[-1].numero if concursos else None,
         "fonte_dados": metadata,
+    }
+
+
+def _public_batch(batch: dict) -> dict:
+    return {key: value for key, value in batch.items() if key != "owner"}
+
+
+def _get_owned_batch(batch_id: str, owner: str) -> dict:
+    batch = GAME_STORE.get_batch(batch_id, owner)
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Lote de jogos não encontrado.")
+    return batch
+
+
+@app.post("/api/jogos", status_code=201)
+async def api_criar_lote_jogos(payload: GenerateBatchRequest, request: Request):
+    """Gera e persiste um lote de jogos no histórico do usuário autenticado."""
+    owner = get_current_user(request)
+    if not owner:
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    validar_csrf(request)
+    nome = payload.nome.strip()
+    if not nome or any(ord(character) < 32 or ord(character) == 127 for character in nome):
+        raise HTTPException(status_code=422, detail="Informe um nome de lote válido, sem caracteres de controle.")
+    try:
+        loteria = LoteriaTipo(payload.loteria)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Modalidade inválida.") from exc
+
+    loteria, concursos, metadata = await carregar_concursos_api(
+        loteria.value, payload.fonte, payload.historico
+    )
+    quantidade_dezenas = loteria.minimo_aposta if payload.dezenas is None else payload.dezenas
+    if not loteria.minimo_aposta <= quantidade_dezenas <= loteria.maximo_aposta:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Para {loteria.value}, dezenas deve ficar entre "
+                f"{loteria.minimo_aposta} e {loteria.maximo_aposta}."
+            ),
+        )
+    engine = MotorPrincipal(concursos)
+    generated = engine.gerar_jogos(
+        payload.metodo, n_dezenas=quantidade_dezenas, n_jogos=payload.jogos
+    )
+    try:
+        batch = GAME_STORE.create_batch(
+            owner=owner,
+            name=nome,
+            lottery=loteria.value,
+            method=payload.metodo,
+            number_count=quantidade_dezenas,
+            source=metadata["fonte"],
+            reference_draw=concursos[-1].numero if concursos else None,
+            games=[item["dezenas"] for item in generated],
+        )
+    except (OSError, sqlite3.Error) as exc:
+        _log.exception("Falha ao persistir lote de jogos")
+        raise HTTPException(status_code=503, detail="Não foi possível salvar o histórico de jogos.") from exc
+    return {**_public_batch(batch), "fonte_dados": metadata}
+
+
+@app.get("/api/jogos")
+async def api_historico_jogos(request: Request, limite: int = Query(default=50, ge=1, le=100)):
+    owner = get_current_user(request)
+    if not owner:
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    return {"lotes": [_public_batch(item) for item in GAME_STORE.list_batches(owner, limite)]}
+
+
+@app.get("/api/jogos/{batch_id}/texto")
+async def api_exportar_lote_txt(batch_id: str, request: Request):
+    owner = get_current_user(request)
+    if not owner:
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    batch = _get_owned_batch(batch_id, owner)
+    lines = [
+        "LOTTOIA — JOGOS GERADOS",
+        f"Nome: {batch['name']}",
+        f"Modalidade: {batch['lottery']}",
+        f"Método: {batch['method']}",
+        f"Dezenas por jogo: {batch['number_count']}",
+        f"Quantidade de jogos: {batch['game_count']}",
+        f"Fonte: {batch['source']}",
+        f"Concurso de referência: {batch['reference_draw'] or 'não informado'}",
+        f"Gerado em (UTC): {batch['created_at']}",
+        "",
+    ]
+    lines.extend(
+        f"Jogo {index}: " + " ".join(f"{number:02d}" for number in numbers)
+        for index, numbers in enumerate(batch["games"], start=1)
+    )
+    lines.extend(["", "Nota: combinação não representa previsão nem aumenta a probabilidade de acerto."])
+    return PlainTextResponse(
+        "\n".join(lines) + "\n",
+        headers={
+            "Content-Disposition": f'attachment; filename="lottoia_{batch_id[:12]}.txt"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@app.get("/api/jogos/{batch_id}/comparar")
+async def api_comparar_lote(
+    batch_id: str,
+    request: Request,
+    quantidade: int = Query(default=30, ge=1, le=100),
+    atualizar: bool = Query(default=False),
+):
+    owner = get_current_user(request)
+    if not owner:
+        return JSONResponse({"error": "Não autenticado"}, status_code=401)
+    batch = _get_owned_batch(batch_id, owner)
+    _, concursos, metadata = await carregar_concursos_api(
+        batch["lottery"], "caixa", quantidade, atualizar
+    )
+    latest = concursos[-1].numero if concursos else None
+    espelho = []
+    resumo = {
+        index: {"maximo_acertos": 0, "concurso_maximo": None}
+        for index in range(1, batch["game_count"] + 1)
+    }
+    for concurso in concursos:
+        sorteadas = set(concurso.dezenas)
+        resultados_jogos = []
+        for index, jogo in enumerate(batch["games"], start=1):
+            correspondencias = sorted(set(jogo) & sorteadas)
+            acertos = len(correspondencias)
+            if acertos > resumo[index]["maximo_acertos"]:
+                resumo[index] = {"maximo_acertos": acertos, "concurso_maximo": concurso.numero}
+            resultados_jogos.append(
+                {"jogo": index, "acertos": acertos, "dezenas_correspondentes": correspondencias}
+            )
+        espelho.append(
+            {
+                "concurso": concurso.numero,
+                "data": concurso.data.isoformat(),
+                "atual": concurso.numero == latest,
+                "dezenas_sorteadas": concurso.dezenas,
+                "jogos": resultados_jogos,
+            }
+        )
+    return {
+        "lote_id": batch_id,
+        "nome": batch["name"],
+        "loteria": batch["lottery"],
+        "concurso_mais_recente": latest,
+        "resumo_por_jogo": [
+            {"jogo": index, **resumo[index]} for index in range(1, batch["game_count"] + 1)
+        ],
+        "resultados_comparados": espelho,
+        "fonte_dados": metadata,
+        "aviso": "Comparação retrospectiva de coincidências; não estima nem prevê sorteios futuros.",
     }
 
 # ──────────────────────────────────────────────

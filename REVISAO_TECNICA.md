@@ -11,14 +11,16 @@ A aplicação pode ser executada como CLI ou como serviço FastAPI. A CLI oferec
 1. **Importações e API pública:** removida da suíte uma alteração de `sys.path` que fazia os shims em `core/` importarem a si mesmos. O pacote `core` agora exporta sob demanda os tipos e motores exemplificados no README (`MotorPrincipal`, `Concurso`, `LoteriaTipo`, `EstrategiaConfig`, `MotorEstatistico`, `MotorScore` e `MotorTemporal`). Os módulos-fonte continuam na raiz; `core/` é uma camada de compatibilidade.
 2. **Monte Carlo:** `monte_carlo_aleatorio` agora executa exatamente `n_simulacoes`, inclusive quando esse valor supera a quantidade de concursos disponíveis, amostrando concursos históricos com reposição. Rejeita quantidade inválida, dados históricos ausentes e quantidade inválida de dezenas; usa um gerador NumPy local para não alterar o estado aleatório global.
 3. **Score e correlação:** durante cada cálculo de score, a matriz de correlação é calculada uma vez e reutilizada para as dezenas. Antes, a matriz — cujo cálculo percorre os concursos e pares de dezenas — era reconstruída para cada dezena.
-4. **Web e sessão:** a chave fixa de desenvolvimento foi removida. Sem `SESSION_SECRET`, uma chave aleatória temporária é criada e registrada como aviso; em produção, deve ser definida de forma estável. O login limpa a sessão antes de atribuí-la, a senha é comparada sem remover espaços e a sessão tem validade de 12 horas. `SESSION_HTTPS_ONLY=true` ativa o atributo Secure para uso atrás de HTTPS.
+4. **Web e sessão:** a chave fixa de desenvolvimento foi removida. Sem `SESSION_SECRET`, uma chave aleatória temporária é criada e registrada como aviso; em produção, deve ser definida de forma estável. O login limpa a sessão antes de atribuí-la, a senha é comparada sem remover espaços e a sessão tem validade de 12 horas. Cookies usam `HttpOnly`/`SameSite=Lax`; `SESSION_HTTPS_ONLY=true` ativa `Secure` em HTTPS. Gravações de jogos exigem token CSRF vinculado à sessão.
 5. **Validação de requisições:** `/api/gerar` limita jogos a 1–50 e dezenas a 15–20 (Lotofácil); `/api/simular` aceita 1–10.000 simulações. Valores fora dos limites resultam em HTTP 422.
 6. **Dependência do formulário:** incluído `python-multipart`, necessário para que o FastAPI registre e processe o formulário de login.
-7. **Container:** Docker e Compose iniciam o servidor web em `0.0.0.0:5000`, não apenas a demonstração CLI. O Compose exige `SESSION_SECRET`, `ADMIN_USERNAME` e `ADMIN_PASSWORD` no ambiente.
+7. **Container:** a imagem usa `requirements-docker.txt` com as dependências web/motores necessários, inicia FastAPI em `0.0.0.0:5000` dentro do contêiner e o Compose local publica apenas em `127.0.0.1`. O processo roda sem privilégios administrativos. `.dockerignore` exclui `.env`, banco e cache do build context. O Compose exige segredos e monta volume persistente; a imagem inclui health check.
 8. **Testes:** adicionados testes de regressão para quantidade exata de simulações, rejeição de entrada inválida e cálculo único da matriz de correlação.
 9. **Resultados CAIXA:** criado `caixa_client.py` para mapear modalidades internas aos slugs da CAIXA, validar número/data/dezenas e consultar o concurso mais recente. Como o índice da fonte pode ficar defasado, o cliente verifica concursos subsequentes; resultados de até 300 concursos são buscados com paralelismo limitado.
 10. **Cache e indisponibilidade:** cache JSON local, escrita atômica e TTL de 10 minutos; em falha de rede, o uso do cache é explicitamente identificado como recente ou desatualizado. Sem cache válido, a API retorna HTTP 503. Credenciais e dados de cache não são adicionados ao Git.
 11. **API/CLI/UI:** rotas de resultados, análise, geração, simulação e testes aceitam modalidade e fonte; CLI tem `resultados` e `analisar`. O dashboard exibe concursos oficiais, permite atualização forçada e seleciona as três modalidades suportadas, com limites de dezenas adequados. Modalidades não suportadas aparecem desabilitadas.
+12. **Histórico de jogos:** `games_store.py` persiste lotes nomeados no SQLite local. O lote registra método, modalidade, quantidade, combinações, fonte, concurso-base e horário. A API/área autenticada permite listar histórico, baixar `.txt` e comparar cada combinação com até 100 concursos oficiais, destacando o mais recente e as dezenas coincidentes.
+13. **Isolamento e segurança do histórico:** rotas de leitura filtram pelo usuário da sessão; lote alheio não é revelado. Nomes são validados e escapados ao renderizar, exportações têm `Cache-Control: private, no-store`, e o banco/cache não são versionados.
 
 ## Estrutura e responsabilidades
 
@@ -42,10 +44,11 @@ O código de domínio está principalmente na raiz; os módulos em `core/` reexp
 | `motor_ml.py` | Modelos de ML disponíveis no módulo; não é uma opção da lista de métodos da CLI/web nesta configuração. |
 | `motor_relatorios.py` | Relatórios executivos, JSON e dados para CSV/simulações. |
 | `caixa_client.py` | Cliente CAIXA, validação do payload oficial e cache local com fallback identificado. |
+| `games_store.py` | Persistência SQLite de lotes nomeados, com filtro por usuário. |
 | `app.py`, `templates/`, `static/` | Aplicação FastAPI, sessão de login, páginas e assets do dashboard. |
 | `run.py` | CLI de demonstração, consulta oficial, análise, geração, simulação e testes. |
 | `test_motores.py`, `tests/` | Testes de domínio, cliente CAIXA, API, integração, cache e regressões. |
-| `requirements.txt`, `Dockerfile`, `docker-compose.yml` | Dependências Python, imagem e execução web containerizada. |
+| `requirements.txt`, `requirements-docker.txt`, `Dockerfile`, `docker-compose.yml`, `.env.example`, `.dockerignore` | Dependências completas/dev e mínimas/web, imagem não-root, exclusão de secrets, volume persistente e configuração local. |
 
 ## Fluxo da lógica
 
@@ -54,7 +57,9 @@ O código de domínio está principalmente na raiz; os módulos em `core/` reexp
 3. `MotorPrincipal` ordena o histórico e compõe os motores de estatística, score, estratégia, tempo, padrões, testes, simulação, relatório e geração.
 4. Os motores calculam métricas descritivas a partir do histórico. O score pondera frequência absoluta/recente, atraso, tendência, ciclos e correlação; o gerador seleciona combinações conforme o método escolhido.
 5. A simulação cria jogos aleatórios e os compara com concursos históricos. Backtests separam janelas de treino/teste em ordem temporal.
-6. A API web verifica sessão antes de expor resultados e análises; o login usa credenciais de ambiente e proteção de tentativas por endereço IP em memória.
+6. A rota autenticada de criação verifica CSRF, gera o lote com a modalidade/método/quantidade recebidos e grava seus metadados e combinações em SQLite.
+7. Histórico, exportação TXT e comparação confirmam proprietário pela sessão. A comparação cruza combinações com resultados CAIXA, apresenta coincidências por concurso e assinala o resultado publicado mais recente.
+8. As demais rotas web verificam sessão; login usa credenciais do ambiente e proteção de tentativas por IP em memória.
 
 A aleatoriedade dos sorteios significa que frequência histórica, atraso, score e modelos não devem ser tratados como vantagem preditiva. Os testes estatísticos descrevem uma amostra e não demonstram previsibilidade.
 
@@ -87,35 +92,21 @@ python app.py
 
 A aplicação escuta a porta 5000. Os endpoints de geração/simulação e o dashboard exigem login. Sem usuário e senha de administrador, nenhum login é aceito.
 
-### Docker Compose
+### Docker local
 
-Crie um arquivo `.env` local (não o versione) com os três valores abaixo, usando credenciais próprias:
-
-```dotenv
-SESSION_SECRET=gere-um-segredo-aleatorio-longo
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=senha-forte
-```
-
-Em seguida, execute:
-
-```bash
-docker compose up --build -d
-```
-
-O serviço web fica na porta 5000. Se o tráfego for servido por HTTPS atrás de um proxy TLS, configure `SESSION_HTTPS_ONLY=true` no ambiente do container para cookies `Secure`. O Compose atual não provisiona PostgreSQL, Redis nem frontend React; as definições de banco/cache no YAML estão comentadas.
+O sandbox de desenvolvimento atual não tem Docker instalado; não foi possível executar o build real desta imagem. Para setup Windows/macOS/Linux, secrets, verificação da instalação, `docker compose up`, volume, backup e publicação web/mobile, consulte [OPERACAO_DOCKER_E_JOGOS.md](OPERACAO_DOCKER_E_JOGOS.md). O `.env.example` é apenas um modelo vazio: preencha os três secrets antes de iniciar. O serviço local vincula em `127.0.0.1:5000`; dados persistem no volume nomeado `lottoia_data`.
 
 ## Testes e desempenho observado
 
 Validação executada no sandbox, Python 3.12.3:
 
 - `python -m compileall -q .`: passou.
-- `python -m pytest -q`: **45 testes passaram** na rodada final, incluindo parsing e rejeição de payloads CAIXA inválidos, descoberta do concurso mais recente, cache/fallback offline e integração autenticada das rotas/modalidades.
+- `python -m pytest -q`: **53 testes passaram** após a implementação de persistência/CSRF/comparação, incluindo a nova suíte de histórico SQLite e geração nas três modalidades suportadas.
 - `python -m compileall -q .`, `node --check static/js/dashboard.js` e `git diff --check`: passaram.
 - Teste HTTP com `TestClient`: login, dashboard, autorização, limites, resultados, análise, geração, simulação e testes estatísticos passaram usando cliente CAIXA controlado por mocks (sem tráfego externo na suíte).
 - `python run.py demo`: conclusão normal.
-- Consultas oficiais ao vivo confirmaram Lotofácil #3811, Mega-Sena #3073 e Lotomania #2990 em 23/10/2026; geração `score` da Lotofácil executada com histórico real de 5 concursos.
-- Docker não estava instalado no ambiente, portanto não foi possível executar `docker build` ou validar o container em runtime.
+- Consulta direta à CAIXA em 24/10/2026 retornou Lotofácil #3812 (apurada em 23/10), após #3811; os snapshots anteriores registraram Mega-Sena #3073 e Lotomania #2990 em 23/10. Geração `score` da Lotofácil também foi executada com histórico real de 5 concursos.
+- O `docker-compose.yml` passou parsing YAML e inspeção de mapeamento local/volume. Docker CLI não está instalado neste ambiente, portanto `docker compose config`, build e health check em runtime ainda precisam ser executados no computador local.
 
 Tempos de parede observados em execuções locais pontuais (incluem inicialização do interpretador; não são SLA nem benchmark de produção):
 

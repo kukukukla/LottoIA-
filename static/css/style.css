@@ -1157,3 +1157,41 @@ body::before {
   font-family: 'Orbitron', monospace;
   font-size: 10px;
 }
+
+
+/* Histórico persistente, exportação e comparação retrospectiva */
+.batch-heading,
+.batch-actions,
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.batch-heading { margin: 6px 0 12px; flex-wrap: wrap; }
+.batch-heading strong { color: var(--neon); }
+.batch-heading span,
+.history-info span,
+.history-info time { color: var(--text-dim); font-size: 11px; }
+.batch-actions { justify-content: flex-start; flex-wrap: wrap; margin-top: 12px; }
+.batch-actions a { text-decoration: none; }
+.history-list { display: grid; gap: 8px; }
+.history-item { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface3); }
+.history-info { min-width: 0; display: grid; gap: 4px; }
+.history-info strong { overflow-wrap: anywhere; }
+
+.comparison-output { margin-top: 14px; }
+.comparison-card { border: 1px solid var(--border2); border-radius: var(--radius); padding: 14px; background: var(--surface2); }
+.comparison-summary { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.comparison-chip { border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px; font-size: 11px; color: var(--text); background: var(--surface3); }
+.comparison-table-wrap { max-height: 420px; overflow: auto; }
+.comparison-table-wrap .data-table { min-width: 640px; }
+.comparison-table-wrap td { vertical-align: top; }
+.current-draw { outline: 1px solid var(--neon-dim); background: rgba(57,255,20,.06); }
+.disclaimer { color: var(--text-dim); font-size: 11px; line-height: 1.5; margin: 12px 0 0; }
+
+@media (max-width: 720px) {
+  .history-item { align-items: flex-start; flex-direction: column; }
+  .batch-actions { width: 100%; }
+}

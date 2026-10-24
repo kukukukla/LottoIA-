@@ -1,38 +1,20 @@
-version: '3.8'
-
 services:
   app:
     build: .
-    container_name: loterias-app
+    container_name: lottoia-app
     ports:
-      - "5000:5000"
+      - "127.0.0.1:${APP_PORT:-5000}:5000"
     volumes:
-      - ./data:/app/data
+      - lottoia_data:/app/data
     environment:
-      - PYTHONPATH=/app
-      - SESSION_SECRET=${SESSION_SECRET:?Defina SESSION_SECRET no ambiente}
-      - ADMIN_USERNAME=${ADMIN_USERNAME:?Defina ADMIN_USERNAME no ambiente}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD no ambiente}
-    command: uvicorn app:app --host 0.0.0.0 --port 5000
+      PYTHONPATH: /app
+      LOTTO_DB_PATH: /app/data/lottoia.sqlite3
+      SESSION_SECRET: ${SESSION_SECRET:?Configure SESSION_SECRET em .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Configure ADMIN_USERNAME em .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Configure ADMIN_PASSWORD em .env}
+      SESSION_HTTPS_ONLY: ${SESSION_HTTPS_ONLY:-false}
+    restart: unless-stopped
 
-  # Descomente para usar com banco de dados:
-  # db:
-  #   image: postgres:15-alpine
-  #   container_name: loterias-db
-  #   environment:
-  #     POSTGRES_DB: loterias
-  #     POSTGRES_USER: loterias
-  #     POSTGRES_PASSWORD: loterias123
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
-  #
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: loterias-redis
-  #   ports:
-  #     - "6379:6379"
-
-# volumes:
-#   postgres_data:
+volumes:
+  lottoia_data:
+    name: lottoia_data
